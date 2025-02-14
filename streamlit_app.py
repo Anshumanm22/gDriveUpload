@@ -156,14 +156,12 @@ def main():
         st.session_state.folder_id = folder_id
         
         if folder_id:
-            with st.spinner("Checking folder access..."):
-                if check_folder_access(drive_service, folder_id):
-                    st.success("✅ Folder access confirmed")
+            with st.spinner("Testing folder access..."):
+                if test_folder_access(drive_service, folder_id):
+                    st.success("✅ Folder access confirmed and tested")
                 else:
-                    st.error("❌ Cannot access this folder. Please make sure:\n" +
-                            "1. The folder ID is correct\n" +
-                            "2. The folder is shared with the service account email\n" +
-                            "3. The service account has at least 'Editor' access to the folder")
+                    st.error("❌ Cannot properly access this folder. Please check the error details above.")
+                    st.info("Make sure the service account has full Editor access to this folder.")
         
         st.markdown("---")  # Add a visual separator
         

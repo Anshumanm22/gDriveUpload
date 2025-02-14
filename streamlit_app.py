@@ -47,6 +47,14 @@ def check_folder_access(service, folder_id):
         service.files().get(fileId=folder_id, fields='id, name').execute()
         return True
     except Exception as e:
+        st.error(f"Error accessing folder: {str(e)}")
+        if "404" in str(e):
+            st.error("This folder ID doesn't exist. Please check if you copied the correct ID.")
+        elif "403" in str(e):
+            st.error("Permission denied. Please make sure:\n" +
+                    "1. The service account email has been given access to this folder\n" +
+                    "2. The service account has at least 'Editor' permissions")
+            st.info(f"If you need to share the folder, please check your service account email in the app settings.")
         return False
 
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):

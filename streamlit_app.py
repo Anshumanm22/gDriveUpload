@@ -141,9 +141,31 @@ def write_to_sheet(sheets_service, spreadsheet_id, data, range_name='Sheet1!A1')
         st.error(f"Error writing to sheet: {str(e)}")
         return None
 
-def read_from_sheet(sheets_service, spreadsheet_id, range_name='Sheet1!A1:Z1000'):
+def get_sheet_names(sheets_service, spreadsheet_id):
+    """Get all sheet names from the spreadsheet."""
+    try:
+        spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+        return [sheet['properties']['title'] for sheet in spreadsheet['sheets']]
+    except Exception as e:
+        st.error(f"Error getting sheet names: {str(e)}")
+        return None
+
+def read_from_sheet(sheets_service, spreadsheet_id, range_name=None):
     """Read data from a Google Sheet."""
     try:
+        # First get available sheet names
+        sheet_names = get_sheet_names(sheets_service, spreadsheet_id)
+        if not sheet_names:
+            st.error("Could not retrieve sheet names from the spreadsheet")
+            return None
+            
+        st.info(f"Available sheets: {', '.join(sheet_names)}")
+        
+        # If no range specified, use the first sheet
+        if not range_name:
+            range_name = f"{sheet_names[0]}!A1:Z1000"
+            st.info(f"Using sheet: {sheet_names[0]}")
+        
         result = sheets_service.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
             range=range_name
@@ -151,12 +173,16 @@ def read_from_sheet(sheets_service, spreadsheet_id, range_name='Sheet1!A1:Z1000'
         
         values = result.get('values', [])
         if not values:
+            st.warning("No data found in the sheet")
             return pd.DataFrame()
             
         df = pd.DataFrame(values[1:], columns=values[0])
+        st.success(f"Successfully read {len(df)} rows of data")
         return df
     except Exception as e:
         st.error(f"Error reading from sheet: {str(e)}")
+        if "Unable to parse range" in str(e):
+            st.error("Sheet name might be incorrect. Please check the available sheet names above.")
         return None
 
 def main():
@@ -240,11 +266,19 @@ def main():
         
         if sheet_id:
             if sheet_action == "Read sheet":
-                if st.button("Read"):
-                    with st.spinner("Reading data..."):
-                        df = read_from_sheet(sheets_service, sheet_id)
-                        if df is not None:
-                            st.dataframe(df)
+                # Get sheet names first
+                sheet_names = get_sheet_names(sheets_service, sheet_id)
+                if sheet_names:
+                    selected_sheet = st.selectbox(
+                        "Select sheet to read",
+                        options=sheet_names
+                    )
+                    if st.button("Read"):
+                        with st.spinner("Reading data..."):
+                            range_name = f"{selected_sheet}!A1:Z1000"
+                            df = read_from_sheet(sheets_service, sheet_id, range_name)
+                            if df is not None:
+                                st.dataframe(df)
             
             else:  # Update sheet
                 uploaded_file = st.file_uploader(

@@ -44,16 +44,25 @@ def get_google_services():
 def check_folder_access(service, folder_id):
     """Check if the folder exists and is accessible."""
     try:
-        service.files().get(fileId=folder_id, fields='id, name').execute()
+        # Add support for shared drives
+        service.files().get(
+            fileId=folder_id,
+            fields='id, name',
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
         return True
     except Exception as e:
         st.error(f"Error accessing folder: {str(e)}")
         if "404" in str(e):
-            st.error("This folder ID doesn't exist. Please check if you copied the correct ID.")
+            st.error("This folder ID doesn't exist or is in a shared drive. Please check:\n" +
+                    "1. The folder ID is correct\n" +
+                    "2. If this is a shared drive folder, make sure the service account has access to shared drives")
         elif "403" in str(e):
             st.error("Permission denied. Please make sure:\n" +
                     "1. The service account email has been given access to this folder\n" +
-                    "2. The service account has at least 'Editor' permissions")
+                    "2. The service account has at least 'Editor' permissions\n" +
+                    "3. If this is a shared drive, the service account has been added to the shared drive")
             st.info(f"If you need to share the folder, please check your service account email in the app settings.")
         return False
 

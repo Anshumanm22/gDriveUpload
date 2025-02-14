@@ -41,12 +41,28 @@ def get_google_services():
         st.error(f"Error setting up Google services: {str(e)}")
         return None, None
 
+def check_folder_access(service, folder_id):
+    """Check if the folder exists and is accessible."""
+    try:
+        service.files().get(fileId=folder_id, fields='id, name').execute()
+        return True
+    except Exception as e:
+        return False
+
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):
     """Upload a file to a specific Google Drive folder."""
     try:
+        # First check if we can access the folder
+        if not check_folder_access(service, folder_id):
+            st.error(f"Cannot access folder with ID: {folder_id}. Please make sure: \n" +
+                    "1. The folder ID is correct\n" +
+                    "2. The folder is shared with the service account email\n" +
+                    "3. The service account has at least 'Editor' access to the folder")
+            return None
+            
         file_metadata = {
             'name': filename,
-            'parents': [folder_id]  # Specify the parent folder
+            'parents': [folder_id]
         }
         
         media = MediaIoBaseUpload(
@@ -59,6 +75,7 @@ def upload_to_drive(service, file_data, filename, mimetype, folder_id):
             body=file_metadata,
             media_body=media,
             fields='id',
+            supportsAllDrives=True  # Add support for shared drives
         ).execute()
         
         return file.get('id')
@@ -135,8 +152,18 @@ def main():
                  "https://drive.google.com/drive/folders/FOLDER_ID"
         )
         
-        # Update session state
+        # Update session state and validate folder ID
         st.session_state.folder_id = folder_id
+        
+        if folder_id:
+            with st.spinner("Checking folder access..."):
+                if check_folder_access(drive_service, folder_id):
+                    st.success("✅ Folder access confirmed")
+                else:
+                    st.error("❌ Cannot access this folder. Please make sure:\n" +
+                            "1. The folder ID is correct\n" +
+                            "2. The folder is shared with the service account email\n" +
+                            "3. The service account has at least 'Editor' access to the folder")
         
         st.markdown("---")  # Add a visual separator
         

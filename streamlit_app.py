@@ -41,10 +41,14 @@ def get_google_services():
         st.error(f"Error setting up Google services: {str(e)}")
         return None, None
 
-def upload_to_drive(service, file_data, filename, mimetype):
-    """Upload a file to Google Drive."""
+def upload_to_drive(service, file_data, filename, mimetype, folder_id):
+    """Upload a file to a specific Google Drive folder."""
     try:
-        file_metadata = {'name': filename}
+        file_metadata = {
+            'name': filename,
+            'parents': [folder_id]  # Specify the parent folder
+        }
+        
         media = MediaIoBaseUpload(
             io.BytesIO(file_data),
             mimetype=mimetype,
@@ -54,7 +58,7 @@ def upload_to_drive(service, file_data, filename, mimetype):
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id'
+            fields='id',
         ).execute()
         
         return file.get('id')
@@ -117,13 +121,32 @@ def main():
     
     with tab1:
         st.header("Upload Files to Drive")
+        
+        # Store folder ID in session state if not already there
+        if 'folder_id' not in st.session_state:
+            st.session_state.folder_id = ''
+            
+        # Add folder ID input at the top
+        folder_id = st.text_input(
+            "Enter Google Drive Folder ID",
+            value=st.session_state.folder_id,
+            help="This is the ID of the folder where files will be uploaded. " +
+                 "You can find it in the folder's URL: " +
+                 "https://drive.google.com/drive/folders/FOLDER_ID"
+        )
+        
+        # Update session state
+        st.session_state.folder_id = folder_id
+        
+        st.markdown("---")  # Add a visual separator
+        
         uploaded_files = st.file_uploader(
             "Choose files to upload",
             type=['png', 'jpg', 'jpeg', 'mp4', 'mov', 'avi', 'csv', 'xlsx'],
             accept_multiple_files=True
         )
         
-        if uploaded_files:
+        if uploaded_files and folder_id:
             st.write("Selected files:")
             for file in uploaded_files:
                 col1, col2 = st.columns([3, 1])
@@ -136,11 +159,14 @@ def main():
                                 drive_service,
                                 file.getvalue(),
                                 file.name,
-                                file.type
+                                file.type,
+                                folder_id
                             )
                             if file_id:
                                 st.success(f"Successfully uploaded {file.name}")
                                 st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
+        elif uploaded_files:
+            st.warning("Please enter a folder ID before uploading files.")
     
     with tab2:
         st.header("Google Sheets Manager")
@@ -184,14 +210,23 @@ def main():
     
     st.sidebar.markdown("""
     ### Instructions:
-    1. Make sure the Google Sheet is shared with the service account email
-    2. Choose between File Upload or Sheets Manager
-    3. For files: Select and upload files to Drive
-    4. For sheets:
-       - Read existing sheets using Sheet ID
-       - Update existing sheets with new data
+    1. For uploading files:
+       - Get the folder ID from your Google Drive folder URL
+       - Paste the folder ID in the input field
+       - Select files to upload
+       - Make sure the folder is shared with the service account email
+       
+    2. For Google Sheets:
+       - Make sure the sheet is shared with the service account email
+       - Get the Sheet ID from the sheet's URL
+       - Choose to read or update the sheet
     
-    The Sheet ID can be found in the sheet's URL:
+    To get Folder ID:
+    ```
+    https://drive.google.com/drive/folders/{FOLDER_ID}
+    ```
+    
+    To get Sheet ID:
     ```
     https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit
     ```

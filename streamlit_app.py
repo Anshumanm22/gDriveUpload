@@ -75,7 +75,7 @@ def upload_to_drive(service, file_data, filename, mimetype, folder_id):
             body=file_metadata,
             media_body=media,
             fields='id',
-            supportsAllDrives=True  # Add support for shared drives
+            supportsAllDrives=True
         ).execute()
         
         return file.get('id')
@@ -157,13 +157,13 @@ def main():
         
         if folder_id:
             with st.spinner("Testing folder access..."):
-                if test_folder_access(drive_service, folder_id):
+                if check_folder_access(drive_service, folder_id):  # Fixed: Changed test_folder_access to check_folder_access
                     st.success("✅ Folder access confirmed and tested")
                 else:
                     st.error("❌ Cannot properly access this folder. Please check the error details above.")
                     st.info("Make sure the service account has full Editor access to this folder.")
         
-        st.markdown("---")  # Add a visual separator
+        st.markdown("---")
         
         uploaded_files = st.file_uploader(
             "Choose files to upload",

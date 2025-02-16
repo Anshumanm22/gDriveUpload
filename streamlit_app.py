@@ -25,6 +25,38 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file',
 # Constants
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
 
+@st.cache_resource
+def get_google_services():
+    """Get Google Drive and Sheets services using service account."""
+    try:
+        # Check if secrets are loaded
+        if "gcp_service_account" not in st.secrets:
+            st.error("gcp_service_account not found in secrets")
+            return None, None
+            
+        # Check service account structure
+        required_fields = ["type", "project_id", "private_key", "client_email"]
+        missing_fields = [field for field in required_fields if field not in st.secrets["gcp_service_account"]]
+        if missing_fields:
+            st.error(f"Missing required fields in service account: {missing_fields}")
+            return None, None
+            
+        # Create credentials
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
+        )
+        
+        # Build services
+        drive_service = build('drive', 'v3', credentials=credentials)
+        sheets_service = build('sheets', 'v4', credentials=credentials)
+        
+        return drive_service, sheets_service
+    except Exception as e:
+        st.error(f"Error setting up Google services: {str(e)}")
+        return None, None
+
+
 def get_sheet_names(sheets_service):
     """Get all sheet names from the spreadsheet."""
     try:

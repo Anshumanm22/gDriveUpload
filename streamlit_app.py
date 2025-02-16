@@ -56,40 +56,6 @@ def get_google_services():
         st.error(f"Error setting up Google services: {str(e)}")
         return None, None
 
-
-def get_sheet_names(sheets_service):
-    """Get all sheet names from the spreadsheet."""
-    try:
-        # Get the spreadsheet metadata
-        spreadsheet = sheets_service.spreadsheets().get(
-            spreadsheetId=SHEET_ID
-        ).execute()
-        
-        # Extract sheet names from the metadata
-        return [sheet['properties']['title'] for sheet in spreadsheet['sheets']]
-    except Exception as e:
-        st.error(f"Error getting sheet names: {str(e)}")
-        return ['Sheet1']  # Return default sheet if error occurs
-
-def read_from_sheet(sheets_service, range_name='Sheet1!A1:Z1000'):
-    """Read data from the specified Google Sheet."""
-    try:
-        result = sheets_service.spreadsheets().values().get(
-            spreadsheetId=SHEET_ID,
-            range=range_name
-        ).execute()
-        
-        values = result.get('values', [])
-        if not values:
-            st.warning("No data found in the sheet")
-            return pd.DataFrame()
-            
-        df = pd.DataFrame(values[1:], columns=values[0])
-        return df
-    except Exception as e:
-        st.error(f"Error reading from sheet: {str(e)}")
-        return None
-
 def write_to_sheet(sheets_service, data, range_name='Sheet1!A1'):
     """Write data to the specified Google Sheet."""
     try:

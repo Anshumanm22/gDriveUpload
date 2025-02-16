@@ -126,7 +126,7 @@ def create_observation_form():
             st.session_state.selected_pm = selected_pm
             st.session_state.selected_school = selected_school
             st.session_state.visit_date = visit_date
-            st.experimental_rerun()
+            st.rerun()
     
     # Section 2: Teacher Selection
     elif st.session_state.step == 2:
@@ -159,11 +159,11 @@ def create_observation_form():
         with col1:
             if st.button("Previous"):
                 st.session_state.step = 1
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Next"):
                 st.session_state.step = 3
-                st.experimental_rerun()
+                st.rerun()
     
     # Section 3: Daily Visit Observations
     elif st.session_state.step == 3:
@@ -189,11 +189,11 @@ def create_observation_form():
         with col1:
             if st.button("Previous"):
                 st.session_state.step = 2
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Next"):
                 st.session_state.step = 4
-                st.experimental_rerun()
+                st.rerun()
     
     # Section 4: Infrastructure
     elif st.session_state.step == 4:
@@ -233,11 +233,11 @@ def create_observation_form():
         with col1:
             if st.button("Previous"):
                 st.session_state.step = 3
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Next"):
                 st.session_state.step = 5
-                st.experimental_rerun()
+                st.rerun()
     
     # Section 5: Community
     elif st.session_state.step == 5:
@@ -276,14 +276,14 @@ def create_observation_form():
         with col1:
             if st.button("Previous"):
                 st.session_state.step = 4
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Submit"):
                 # Here you would add code to save all the collected data
                 # to the Observations sheet
                 st.success("Form submitted successfully!")
                 st.session_state.step = 1
-                st.experimental_rerun()
+                st.rerun()
 
 def main():
     create_observation_form()

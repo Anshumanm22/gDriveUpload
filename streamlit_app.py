@@ -95,11 +95,13 @@ def upload_to_drive(service, file_data, filename, mimetype, folder_id):
             'name': filename,
             'parents': [folder_id]
         }
+
         media = MediaIoBaseUpload(
             io.BytesIO(file_data),
             mimetype=mimetype,
             resumable=True
         )
+
         file = service.files().create(
             body=file_metadata,
             media_body=media,
@@ -109,7 +111,7 @@ def upload_to_drive(service, file_data, filename, mimetype, folder_id):
         return file.get('id')
     except Exception as e:
         st.error(f"Error uploading {filename}: {str(e)}")
-        return None
+        return None #Ensure there is a return
 
 def write_to_sheet(sheets_service, spreadsheet_id, data, range_name='Sheet1!A1'):
     """Write data to a Google Sheet."""
@@ -147,4 +149,10 @@ def read_from_sheet(sheets_service, spreadsheet_id, range_name=None):
         sheet_names = get_sheet_names(sheets_service, spreadsheet_id)
         if not sheet_names:
             st.error("Could not retrieve sheet names from the spreadsheet")
-            return
+            return None
+        st.info(f"Available sheets: {', '.join(sheet_names)}")
+        # If no range specified, use the first sheet
+        if not range_name:
+            range_name = f"{sheet_names[0]}!A1:Z1000"
+        st.info(f"Using sheet: {sheet_names[0]}")
+        result = sheets_service

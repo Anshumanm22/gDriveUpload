@@ -75,7 +75,7 @@ def get_teachers_for_school(df, school_name):
     
     return list(set(all_teachers))
 
-def render_section_1():
+def render_section_1(sheets_service):
     """Basic Details Section"""
     st.subheader("Basic Details")
     
@@ -105,7 +105,7 @@ def render_section_1():
             st.session_state.current_section += 1
             st.experimental_rerun()
 
-def render_section_2():
+def render_section_2(sheets_service):
     """Teacher Selection Section"""
     st.subheader("Teacher Details")
     
@@ -309,9 +309,9 @@ def main():
     
     # Render current section
     if st.session_state.current_section == 1:
-        render_section_1()
+        render_section_1(sheets_service)
     elif st.session_state.current_section == 2:
-        render_section_2()
+        render_section_2(sheets_service)
     elif st.session_state.current_section == 3:
         render_section_3()
     elif st.session_state.current_section == 4:

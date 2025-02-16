@@ -18,9 +18,32 @@ if 'current_section' not in st.session_state:
 if 'form_data' not in st.session_state:
     st.session_state.form_data = {}
 
+@st.cache_resource
 def get_google_services():
-    # Previous implementation remains the same
-    [... previous code ...]
+    """Get Google Drive and Sheets services using service account."""
+    try:
+        if "gcp_service_account" not in st.secrets:
+            st.error("gcp_service_account not found in secrets")
+            return None, None
+            
+        required_fields = ["type", "project_id", "private_key", "client_email"]
+        missing_fields = [field for field in required_fields if field not in st.secrets["gcp_service_account"]]
+        if missing_fields:
+            st.error(f"Missing required fields in service account: {missing_fields}")
+            return None, None
+            
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
+        )
+        
+        drive_service = build('drive', 'v3', credentials=credentials)
+        sheets_service = build('sheets', 'v4', credentials=credentials)
+        
+        return drive_service, sheets_service
+    except Exception as e:
+        st.error(f"Error setting up Google services: {str(e)}")
+        return None, None
 
 def read_school_data(sheets_service):
     """Read school and teacher mapping data."""
@@ -258,13 +281,83 @@ def main():
     with tab1:
         render_form()
     
-    with tab2:
-        # Previous file upload code
-        [... previous upload code ...]
+      with tab2:
+        st.header("Upload Files to Drive")
+        
+        # Check folder access
+        with st.spinner("Checking folder access..."):
+            if check_folder_access(drive_service, FOLDER_ID):
+                st.success("✅ Drive folder access confirmed")
+            else:
+                st.error("❌ Cannot access the Drive folder")
+        
+        uploaded_files = st.file_uploader(
+            "Choose files to upload",
+            type=['png', 'jpg', 'jpeg', 'mp4', 'mov', 'avi', 'csv', 'xlsx'],
+            accept_multiple_files=True
+        )
+        
+        if uploaded_files:
+            st.write("Selected files:")
+            for file in uploaded_files:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📎 {file.name}")
+                with col2:
+                    if st.button("Upload", key=f"upload_{file.name}"):
+                        with st.spinner(f"Uploading {file.name}..."):
+                            file_id = upload_to_drive(
+                                drive_service,
+                                file.getvalue(),
+                                file.name,
+                                file.type
+                            )
+                            if file_id:
+                                st.success(f"Successfully uploaded {file.name}")
+                                st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
     
     with tab3:
-        # Previous sheet view code
-        [... previous sheet view code ...]
+        st.header("Google Sheets Manager")
+        
+        sheet_action = st.radio(
+            "Choose action:",
+            ["Read sheet", "Update sheet"]
+        )
+        
+        if sheet_action == "Read sheet":
+            sheet_names = get_sheet_names(sheets_service)
+            if sheet_names:
+                selected_sheet = st.selectbox(
+                    "Select sheet to read",
+                    options=sheet_names
+                )
+                if st.button("Read"):
+                    with st.spinner("Reading data..."):
+                        range_name = f"{selected_sheet}!A1:Z1000"
+                        df = read_from_sheet(sheets_service, range_name)
+                        if df is not None:
+                            st.dataframe(df)
+        
+        else:  # Update sheet
+            uploaded_file = st.file_uploader(
+                "Upload new data (CSV/Excel)",
+                type=['csv', 'xlsx']
+            )
+            
+            if uploaded_file and st.button("Update"):
+                with st.spinner("Updating sheet..."):
+                    if uploaded_file.type == "text/csv":
+                        df = pd.read_csv(uploaded_file)
+                    else:
+                        df = pd.read_excel(uploaded_file)
+                        
+                    result = write_to_sheet(
+                        sheets_service,
+                        df
+                    )
+                    
+                    if result:
+                        st.success("Sheet updated successfully!")
 
 if __name__ == "__main__":
     main()

@@ -26,7 +26,31 @@ def get_google_service():
         st.error(f"Error setting up Google service: {str(e)}")
         return None
 
-def read_from_sheet(service, range_name):
+def upload_to_drive(drive_service, file_data, filename, mimetype):
+    """Upload a file to the specified Google Drive folder."""
+    try:
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_data),
+            mimetype=mimetype,
+            resumable=True
+        )
+        
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
+        
+        return file.get('id')
+    except Exception as e:
+        st.error(f"Error uploading {filename}: {str(e)}")
+        return None:
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
@@ -218,29 +242,18 @@ def main():
                     st.write(f"📎 {file.name}")
                 with col2:
                     # Create a unique key for each button
+                # Create a unique key for each button
                     if st.button("Upload", key=f"upload_{file.name}"):
                         try:
-                            file_metadata = {
-                                'name': f"{st.session_state.program_manager}_{st.session_state.school}_{st.session_state.date}_{file.name}",
-                                'parents': ['1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-']
-                            }
-                            
-                            media = MediaIoBaseUpload(
-                                io.BytesIO(file.getvalue()),
-                                mimetype=file.type,
-                                resumable=True
+                            file_id = upload_to_drive(
+                                drive_service,
+                                file.getvalue(),
+                                f"{st.session_state.program_manager}_{st.session_state.school}_{st.session_state.date}_{file.name}",
+                                file.type
                             )
-                            
-                            # Upload file to Drive
-                            file = drive_service.files().create(
-                                body=file_metadata,
-                                media_body=media,
-                                fields='id',
-                                supportsAllDrives=True
-                            ).execute()
-                            
-                            st.success(f"Successfully uploaded {file.name}")
-                            st.markdown(f"[View file](https://drive.google.com/file/d/{file.get('id')}/view)")
+                            if file_id:
+                                st.success(f"Successfully uploaded {file.name}")
+                                st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
                         except Exception as e:
                             st.error(f"Error uploading {file.name}: {str(e)}")
         

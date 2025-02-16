@@ -535,23 +535,20 @@ def main():
     
     # Initialize Google services
     drive_service, sheets_service = get_google_services()
+    
     if not drive_service or not sheets_service:
         st.error("Failed to initialize Google services")
         return
-    
-    # Store services in session state
-    st.session_state.drive_service = drive_service
-    st.session_state.sheets_service = sheets_service
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["Observation Form", "File Upload", "Data View"])
     
     with tab1:
-        render_form()
+        st.header("School Observation Form")
+        # Form implementation here
     
     with tab2:
-        st.header("Upload Files to Drive")
-        
+        st.header("File Upload")
         uploaded_files = st.file_uploader(
             "Choose files to upload",
             type=['png', 'jpg', 'jpeg', 'mp4', 'mov', 'avi', 'csv', 'xlsx'],
@@ -559,38 +556,40 @@ def main():
         )
         
         if uploaded_files:
-            st.write("Selected files:")
             for file in uploaded_files:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📎 {file.name}")
-                with col2:
-                    if st.button("Upload", key=f"upload_{file.name}"):
-                        with st.spinner(f"Uploading {file.name}..."):
-                            file_id = upload_to_drive(
-                                drive_service,
-                                file.getvalue(),
-                                file.name,
-                                file.type
-                            )
-                            if file_id:
-                                st.success(f"Successfully uploaded {file.name}")
-                                st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
+                if st.button("Upload", key=f"upload_{file.name}"):
+                    try:
+                        file_id = upload_to_drive(
+                            drive_service,
+                            file.getvalue(),
+                            file.name,
+                            file.type
+                        )
+                        if file_id:
+                            st.success(f"Successfully uploaded {file.name}")
+                    except Exception as e:
+                        st.error(f"Error uploading {file.name}: {str(e)}")
     
     with tab3:
         st.header("View Data")
-        sheet_names = get_sheet_names(sheets_service)
-        if sheet_names:
-            selected_sheet = st.selectbox(
-                "Select sheet to view",
-                options=sheet_names
-            )
-            if st.button("View Data"):
-                with st.spinner("Loading data..."):
-                    range_name = f"{selected_sheet}!A1:Z1000"
-                    df = read_from_sheet(sheets_service, range_name)
+        try:
+            # Get available sheets
+            sheet_names = get_sheet_names(sheets_service)
+            
+            if sheet_names:
+                # Let user select a sheet
+                selected_sheet = st.selectbox(
+                    "Select sheet to view",
+                    options=sheet_names
+                )
+                
+                if st.button("View Data"):
+                    # Read and display data
+                    df = read_from_sheet(sheets_service, f"{selected_sheet}!A1:Z1000")
                     if df is not None:
                         st.dataframe(df)
+        except Exception as e:
+            st.error(f"Error accessing sheets: {str(e)}")
 
 if __name__ == "__main__":
     main()

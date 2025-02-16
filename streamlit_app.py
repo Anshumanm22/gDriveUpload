@@ -51,8 +51,9 @@ def main():
     if schools_df is None:
         return
     
-    st.sidebar.progress(st.session_state.step / 5)
-    st.sidebar.markdown(f"Step {st.session_state.step} of 5")
+    # Update sidebar progress
+    st.sidebar.progress(st.session_state.step / 6)
+    st.sidebar.markdown(f"Step {st.session_state.step} of 6")
     
     # Basic Information
     if st.session_state.step == 1:
@@ -196,7 +197,65 @@ def main():
                 st.rerun()
     
     # Community Engagement
+    # Between steps 3 and 4, add media upload section
     elif st.session_state.step == 4:
+        st.header("Upload Media")
+        
+        st.info("Upload photos and videos from your visit. Supported formats: PNG, JPG, MP4, MOV")
+        
+        # Add file uploader
+        uploaded_files = st.file_uploader(
+            "Choose photos/videos to upload",
+            type=['png', 'jpg', 'jpeg', 'mp4', 'mov'],
+            accept_multiple_files=True
+        )
+        
+        if uploaded_files:
+            st.write("Selected files:")
+            for file in uploaded_files:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📎 {file.name}")
+                with col2:
+                    # Create a unique key for each button
+                    if st.button("Upload", key=f"upload_{file.name}"):
+                        try:
+                            file_metadata = {
+                                'name': f"{st.session_state.program_manager}_{st.session_state.school}_{st.session_state.date}_{file.name}",
+                                'parents': ['1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-']
+                            }
+                            
+                            media = MediaIoBaseUpload(
+                                io.BytesIO(file.getvalue()),
+                                mimetype=file.type,
+                                resumable=True
+                            )
+                            
+                            # Upload file to Drive
+                            file = drive_service.files().create(
+                                body=file_metadata,
+                                media_body=media,
+                                fields='id',
+                                supportsAllDrives=True
+                            ).execute()
+                            
+                            st.success(f"Successfully uploaded {file.name}")
+                            st.markdown(f"[View file](https://drive.google.com/file/d/{file.get('id')}/view)")
+                        except Exception as e:
+                            st.error(f"Error uploading {file.name}: {str(e)}")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Previous", key="prev_4"):
+                st.session_state.step = 3
+                st.rerun()
+        with col2:
+            if st.button("Next", key="next_4"):
+                st.session_state.step = 5
+                st.rerun()
+    
+    # Move original step 4 to step 5 and step 5 to step 6
+    elif st.session_state.step == 5:
         st.header("Community Engagement")
         
         month = st.selectbox("Select Month [CPM]", 

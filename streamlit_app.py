@@ -60,8 +60,14 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Your Name")
-            school = st.selectbox("School Name", options=sorted(schools_df['School Name'].unique()))
+            # Get unique program managers
+            program_managers = sorted(schools_df['Program Manager'].unique())
+            selected_pm = st.selectbox("Program Manager", options=program_managers)
+            
+            # Filter schools based on selected program manager
+            pm_schools = sorted(schools_df[schools_df['Program Manager'] == selected_pm]['School Name'].unique())
+            selected_school = st.selectbox("School Name", options=pm_schools)
+            
             date = st.date_input("Date of Visit")
         
         with col2:
@@ -73,10 +79,10 @@ def main():
                                     ["English", "Math", "Science", "Art", "Music", "Others"])
         
         if st.button("Next", key="next_1"):
-            if name and school and date and time and standard and subjects:
+            if selected_pm and selected_school and date and time and standard and subjects:
                 st.session_state.update({
-                    'name': name,
-                    'school': school,
+                    'program_manager': selected_pm,
+                    'school': selected_school,
                     'date': date,
                     'time': time,
                     'standard': standard,

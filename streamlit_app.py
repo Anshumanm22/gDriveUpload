@@ -284,13 +284,6 @@ def main():
     with tab2:
         st.header("Upload Files to Drive")
         
-        # Check folder access
-        with st.spinner("Checking folder access..."):
-            if check_folder_access(drive_service, FOLDER_ID):
-                st.success("✅ Drive folder access confirmed")
-            else:
-                st.error("❌ Cannot access the Drive folder")
-        
         uploaded_files = st.file_uploader(
             "Choose files to upload",
             type=['png', 'jpg', 'jpeg', 'mp4', 'mov', 'avi', 'csv', 'xlsx'],
@@ -317,47 +310,19 @@ def main():
                                 st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
     
     with tab3:
-        st.header("Google Sheets Manager")
-        
-        sheet_action = st.radio(
-            "Choose action:",
-            ["Read sheet", "Update sheet"]
-        )
-        
-        if sheet_action == "Read sheet":
-            sheet_names = get_sheet_names(sheets_service)
-            if sheet_names:
-                selected_sheet = st.selectbox(
-                    "Select sheet to read",
-                    options=sheet_names
-                )
-                if st.button("Read"):
-                    with st.spinner("Reading data..."):
-                        range_name = f"{selected_sheet}!A1:Z1000"
-                        df = read_from_sheet(sheets_service, range_name)
-                        if df is not None:
-                            st.dataframe(df)
-        
-        else:  # Update sheet
-            uploaded_file = st.file_uploader(
-                "Upload new data (CSV/Excel)",
-                type=['csv', 'xlsx']
+        st.header("View Data")
+        sheet_names = get_sheet_names(sheets_service)
+        if sheet_names:
+            selected_sheet = st.selectbox(
+                "Select sheet to view",
+                options=sheet_names
             )
-            
-            if uploaded_file and st.button("Update"):
-                with st.spinner("Updating sheet..."):
-                    if uploaded_file.type == "text/csv":
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
-                        
-                    result = write_to_sheet(
-                        sheets_service,
-                        df
-                    )
-                    
-                    if result:
-                        st.success("Sheet updated successfully!")
+            if st.button("View Data"):
+                with st.spinner("Loading data..."):
+                    range_name = f"{selected_sheet}!A1:Z1000"
+                    df = read_from_sheet(sheets_service, range_name)
+                    if df is not None:
+                        st.dataframe(df)
 
 if __name__ == "__main__":
     main()

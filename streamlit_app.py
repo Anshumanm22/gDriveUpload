@@ -8,36 +8,23 @@ import io
 # Set page config
 st.set_page_config(page_title="Google Drive & Sheets Manager", layout="wide")
 
-# Hardcoded IDs
-FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
-SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-
 # Define the scope
 SCOPES = ['https://www.googleapis.com/auth/drive.file',
           'https://www.googleapis.com/auth/spreadsheets']
+
+# Hardcoded Google Sheet ID
+SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
 
 @st.cache_resource
 def get_google_services():
     """Get Google Drive and Sheets services using service account."""
     try:
-        if "gcp_service_account" not in st.secrets:
-            st.error("gcp_service_account not found in secrets")
-            return None, None
-            
-        required_fields = ["type", "project_id", "private_key", "client_email"]
-        missing_fields = [field for field in required_fields if field not in st.secrets["gcp_service_account"]]
-        if missing_fields:
-            st.error(f"Missing required fields in service account: {missing_fields}")
-            return None, None
-            
         credentials = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
-            scopes=SCOPES
-        )
-        
+            scopes=SCOPES)
+
         drive_service = build('drive', 'v3', credentials=credentials)
         sheets_service = build('sheets', 'v4', credentials=credentials)
-        
         return drive_service, sheets_service
     except Exception as e:
         st.error(f"Error setting up Google services: {str(e)}")
@@ -53,90 +40,100 @@ def check_folder_access(service, folder_id):
         ).execute()
         return True
     except Exception as e:
-        st.error(f"Error accessing folder: {str(e)}")
-        return False
+        try:
+            folder = service.files().get(
+                fileId=folder_id,
+                fields='id, name, mimeType'
+            ).execute()
+            return True
+        except Exception as e:
+            st.error(f"Error accessing folder: {str(e)}")
+            return False
 
-def upload_to_drive(service, file_data, filename, mimetype):
-    """Upload a file to the specified Google Drive folder."""
+def upload_to_drive(service, file_data, filename, mimetype, folder_id):
+    """Upload a file to a specific Google Drive folder."""
     try:
+        if not check_folder_access(service, folder_id):
+            st.error(f"Cannot access folder with ID: {folder_id}.")
+            return None
+
         file_metadata = {
             'name': filename,
-            'parents': [FOLDER_ID]
+            'parents': [folder_id]
         }
-        
         media = MediaIoBaseUpload(
             io.BytesIO(file_data),
             mimetype=mimetype,
             resumable=True
         )
-        
         file = service.files().create(
             body=file_metadata,
             media_body=media,
             fields='id',
             supportsAllDrives=True
         ).execute()
-        
         return file.get('id')
     except Exception as e:
         st.error(f"Error uploading {filename}: {str(e)}")
         return None
 
-def write_to_sheet(sheets_service, data, range_name='Sheet1!A1'):
-    """Write data to the specified Google Sheet."""
+def write_to_sheet(sheets_service, spreadsheet_id, data, range_name='Sheet1!A1'):
+    """Write data to a Google Sheet."""
     try:
         values = data.values.tolist()
+        if not values:
+            st.warning("No data to write to sheet.")
+            return None
+
         headers = data.columns.tolist()
         values.insert(0, headers)
-        
+
         body = {
             'values': values
         }
-        
+
         result = sheets_service.spreadsheets().values().update(
-            spreadsheetId=SHEET_ID,
+            spreadsheetId=spreadsheet_id,
             range=range_name,
             valueInputOption='RAW',
             body=body
         ).execute()
-        
         return result
     except Exception as e:
         st.error(f"Error writing to sheet: {str(e)}")
         return None
 
-def get_sheet_names(sheets_service):
+def get_sheet_names(sheets_service, spreadsheet_id):
     """Get all sheet names from the spreadsheet."""
     try:
-        spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=SHEET_ID).execute()
+        spreadsheet = sheets_service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
         return [sheet['properties']['title'] for sheet in spreadsheet['sheets']]
     except Exception as e:
         st.error(f"Error getting sheet names: {str(e)}")
         return None
 
-def read_from_sheet(sheets_service, range_name=None):
-    """Read data from the specified Google Sheet."""
+def read_from_sheet(sheets_service, spreadsheet_id, range_name=None):
+    """Read data from a Google Sheet."""
     try:
-        sheet_names = get_sheet_names(sheets_service)
+        sheet_names = get_sheet_names(sheets_service, spreadsheet_id)
         if not sheet_names:
             st.error("Could not retrieve sheet names from the spreadsheet")
             return None
-            
+
         if not range_name:
             range_name = f"{sheet_names[0]}!A1:Z1000"
-        
+
         result = sheets_service.spreadsheets().values().get(
-            spreadsheetId=SHEET_ID,
+            spreadsheetId=spreadsheet_id,
             range=range_name
         ).execute()
-        
         values = result.get('values', [])
+
         if not values:
             st.warning("No data found in the sheet")
             return pd.DataFrame()
-            
+
         df = pd.DataFrame(values[1:], columns=values[0])
-        st.success(f"Successfully read {len(df)} rows of data")
         return df
     except Exception as e:
         st.error(f"Error reading from sheet: {str(e)}")
@@ -144,33 +141,29 @@ def read_from_sheet(sheets_service, range_name=None):
 
 def main():
     st.title("📁 Google Drive & Sheets Manager")
-    
+
+    # Initialize services
     drive_service, sheets_service = get_google_services()
-    
     if not drive_service or not sheets_service:
-        st.error("Failed to initialize Google services. Please check your service account configuration.")
+        st.error("Failed to initialize Google services. Check service account.")
         return
-        
-    tab1, tab2 = st.tabs(["File Upload", "Sheets Manager"])
-    
+
+    tab1, tab2 = st.tabs(["File Upload", "Data Entry"])
+
     with tab1:
         st.header("Upload Files to Drive")
-        
-        # Check folder access
-        with st.spinner("Checking folder access..."):
-            if check_folder_access(drive_service, FOLDER_ID):
-                st.success("✅ Drive folder access confirmed")
-            else:
-                st.error("❌ Cannot access the Drive folder")
-        
+        folder_id = st.text_input(
+            "Enter Google Drive Folder ID",
+            help="Folder ID from the URL."
+        )
+
         uploaded_files = st.file_uploader(
             "Choose files to upload",
             type=['png', 'jpg', 'jpeg', 'mp4', 'mov', 'avi', 'csv', 'xlsx'],
             accept_multiple_files=True
         )
-        
-        if uploaded_files:
-            st.write("Selected files:")
+
+        if uploaded_files and folder_id:
             for file in uploaded_files:
                 col1, col2 = st.columns([3, 1])
                 with col1:
@@ -182,64 +175,60 @@ def main():
                                 drive_service,
                                 file.getvalue(),
                                 file.name,
-                                file.type
+                                file.type,
+                                folder_id
                             )
                             if file_id:
-                                st.success(f"Successfully uploaded {file.name}")
+                                st.success(f"Uploaded {file.name}")
                                 st.markdown(f"[View file](https://drive.google.com/file/d/{file_id}/view)")
-    
-    with tab2:
-        st.header("Google Sheets Manager")
-        
-        sheet_action = st.radio(
-            "Choose action:",
-            ["Read sheet", "Update sheet"]
-        )
-        
-        if sheet_action == "Read sheet":
-            sheet_names = get_sheet_names(sheets_service)
-            if sheet_names:
-                selected_sheet = st.selectbox(
-                    "Select sheet to read",
-                    options=sheet_names
-                )
-                if st.button("Read"):
-                    with st.spinner("Reading data..."):
-                        range_name = f"{selected_sheet}!A1:Z1000"
-                        df = read_from_sheet(sheets_service, range_name)
-                        if df is not None:
-                            st.dataframe(df)
-        
-        else:  # Update sheet
-            uploaded_file = st.file_uploader(
-                "Upload new data (CSV/Excel)",
-                type=['csv', 'xlsx']
-            )
-            
-            if uploaded_file and st.button("Update"):
-                with st.spinner("Updating sheet..."):
-                    if uploaded_file.type == "text/csv":
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
-                        
-                    result = write_to_sheet(
-                        sheets_service,
-                        df
-                    )
-                    
-                    if result:
-                        st.success("Sheet updated successfully!")
-    
-    st.sidebar.markdown("""
-    ### About This App
-    This application is configured to work with specific Google Drive and Sheets locations:
-    
-    - Files will be uploaded to a designated Drive folder
-    - Sheet operations will be performed on a specific spreadsheet
-    
-    Make sure the service account has the necessary permissions for both locations.
-    """)
 
-if __name__ == "__main__":
-    main()
+    with tab2:
+        st.header("Data Entry Form")
+
+        # --- Load data from Google Sheets ---
+        try:
+            # Load Schools and Teachers data
+            schools_df = read_from_sheet(sheets_service, SHEET_ID, "Schools")
+            teachers_df = read_from_sheet(sheets_service, SHEET_ID, "Teachers")
+
+            if schools_df is None or teachers_df is None:
+                st.error("Could not load Schools or Teachers data.")
+                return
+
+            school_names = schools_df['School Name'].unique().tolist()
+            program_managers = schools_df['Program Manager'].unique().tolist()
+
+
+            # --- Form Section 1: School and Program Manager ---
+            with st.form("school_pm_form"):
+                st.subheader("School and Program Manager")
+                selected_school = st.selectbox("Select School", school_names)
+                # Find the Program Manager for the selected school (first match)
+                # This assumes there's only one PM per school in the Schools sheet
+                selected_pm = schools_df[schools_df['School Name'] == selected_school]['Program Manager'].iloc[0]
+                st.write(f"Program Manager: {selected_pm}") # Display the PM - make read only to avoid error if not populated.
+
+                submit_school_pm = st.form_submit_button("Select School and PM")
+
+
+            # --- Form Section 2: Teacher Training Attendance ---
+            if selected_school:
+                with st.form("teacher_attendance_form"):
+                    st.subheader("Teacher Training Attendance")
+
+                    # Filter teachers based on the selected school
+                    filtered_teachers = teachers_df[teachers_df['School Name'] == selected_school]['Teacher Name'].tolist()
+
+                    if not filtered_teachers:
+                        st.warning("No teachers found for the selected school.")
+                    else:
+                        teacher_attendance = {}
+                        for teacher in filtered_teachers:
+                            teacher_attendance[teacher] = st.checkbox(f"Attended: {teacher}")
+
+                        submit_attendance = st.form_submit_button("Save Attendance")
+
+                        if submit_attendance:
+                            # Process and store attendance data
+                            attendance_data = []
+                            for

@@ -1,17 +1,25 @@
-import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.errors import HttpError
+import streamlit as st
 import pandas as pd
 from datetime import datetime
+import io
 
 # Set page config
 st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
+
+# Define the scope
+SCOPES = ['https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/spreadsheets']
 
 def get_google_service():
+    """Get Google Sheets service using service account."""
     try:
         if "gcp_service_account" not in st.secrets:
             st.error("gcp_service_account not found in secrets")
@@ -21,9 +29,25 @@ def get_google_service():
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
-        return build('sheets', 'v4', credentials=credentials)
+        
+        drive_service = build('drive', 'v3', credentials=credentials)
+        sheets_service = build('sheets', 'v4', credentials=credentials)
+        
+        return drive_service, sheets_service
     except Exception as e:
-        st.error(f"Error setting up Google service: {str(e)}")
+        st.error(f"Error setting up Google services: {str(e)}")
+        return None, None
+
+def read_from_sheet(service, range_name):
+    """Read data from the specified Google Sheet range."""
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SHEET_ID,
+            range=range_name
+        ).execute()
+        return pd.DataFrame(result.get('values', [])[1:], columns=result.get('values', [[]])[0])
+    except Exception as e:
+        st.error(f"Error reading from sheet: {str(e)}")
         return None
 
 def upload_to_drive(drive_service, file_data, filename, mimetype):
@@ -50,16 +74,8 @@ def upload_to_drive(drive_service, file_data, filename, mimetype):
         return file.get('id')
     except Exception as e:
         st.error(f"Error uploading {filename}: {str(e)}")
-        return None:
-    try:
-        result = service.spreadsheets().values().get(
-            spreadsheetId=SHEET_ID,
-            range=range_name
-        ).execute()
-        return pd.DataFrame(result.get('values', [])[1:], columns=result.get('values', [[]])[0])
-    except Exception as e:
-        st.error(f"Error reading from sheet: {str(e)}")
         return None
+
 
 def main():
     st.title("Program Manager Checklist")

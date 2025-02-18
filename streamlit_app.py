@@ -11,7 +11,7 @@ st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-ROOT_FOLDER_ID = None 
+root_folder_id = None 
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]

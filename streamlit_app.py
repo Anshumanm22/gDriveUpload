@@ -62,6 +62,51 @@ def read_from_sheet(service, range_name):
         st.error(f"Error reading from sheet: {str(e)}")
         return None
 
+
+def check_folder_access(service, folder_id):
+    """Check if the folder exists and is accessible."""
+    try:
+        st.info(f"Attempting to access folder with ID: {folder_id}")
+        
+        # Try to list files in the folder first
+        results = service.files().list(
+            q=f"'{folder_id}' in parents",
+            fields="files(id, name)",
+            spaces='drive'
+        ).execute()
+        
+        # Even if list is empty, if we get here without error, we have access
+        st.info(f"Successfully listed files in folder. Found {len(results.get('files', []))} files.")
+        return True
+        
+    except Exception as list_error:
+        st.warning(f"Error listing files in folder: {str(list_error)}")
+        
+        # If listing fails, try to get folder directly
+        try:
+            folder = service.files().get(
+                fileId=folder_id,
+                fields='id, name, mimeType'
+            ).execute()
+            
+            st.info(f"Found folder: {folder.get('name')} (Type: {folder.get('mimeType')})")
+            return True
+            
+        except Exception as e:
+            st.error(f"Error accessing folder: {str(e)}")
+            if "404" in str(e):
+                st.error("""Folder not found. Please check:
+                1. The folder ID is correct (current ID: {folder_id})
+                2. The folder is shared with the service account with at least 'Editor' access
+                3. You're copying the ID from the URL after 'folders/' """)
+            elif "403" in str(e):
+                st.error("""Permission denied. Please verify:
+                1. The service account email has been given access to this folder
+                2. The sharing settings allow the service account to access the folder
+                3. The service account has at least 'Editor' permissions""")
+            return False
+
+
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):
     """Upload a file to a specific Google Drive folder."""
     try:

@@ -64,62 +64,66 @@ def read_from_sheet(service, range_name):
         st.error(f"Error reading from sheet: {str(e)}")
         return None
 
-
 def check_folder_access(service, folder_id):
-    """Check if the folder exists and is accessible."""
+    """Debug function to check folder access and permissions"""
     try:
-        st.info(f"Attempting to access folder with ID: {folder_id}")
+        # First try to get the folder metadata
+        st.info(f"Checking folder metadata for ID: {folder_id}")
+        folder = service.files().get(
+            fileId=folder_id,
+            fields='id, name, mimeType'
+        ).execute()
+        st.success(f"✓ Found folder: {folder.get('name')} (Type: {folder.get('mimeType')})")
         
-        # Try to list files in the folder first
+        # Try to list files in the folder
+        st.info("Checking ability to list files in folder...")
         results = service.files().list(
             q=f"'{folder_id}' in parents",
             fields="files(id, name)",
-            spaces='drive'
+            spaces='drive',
+            supportsAllDrives=True
         ).execute()
+        st.success(f"✓ Successfully listed files. Found {len(results.get('files', []))} files.")
         
-        # Even if list is empty, if we get here without error, we have access
-        st.info(f"Successfully listed files in folder. Found {len(results.get('files', []))} files.")
         return True
         
-    except Exception as list_error:
-        st.warning(f"Error listing files in folder: {str(list_error)}")
-        
-        # If listing fails, try to get folder directly
-        try:
-            folder = service.files().get(
-                fileId=folder_id,
-                fields='id, name, mimeType'
-            ).execute()
-            
-            st.info(f"Found folder: {folder.get('name')} (Type: {folder.get('mimeType')})")
-            return True
-            
-        except Exception as e:
-            st.error(f"Error accessing folder: {str(e)}")
-            if "404" in str(e):
-                st.error("""Folder not found. Please check:
-                1. The folder ID is correct (current ID: {folder_id})
-                2. The folder is shared with the service account with at least 'Editor' access
-                3. You're copying the ID from the URL after 'folders/' """)
-            elif "403" in str(e):
-                st.error("""Permission denied. Please verify:
-                1. The service account email has been given access to this folder
-                2. The sharing settings allow the service account to access the folder
-                3. The service account has at least 'Editor' permissions""")
-            return False
+    except Exception as e:
+        st.error(f"Error accessing folder: {str(e)}")
+        if "404" in str(e):
+            st.error(f"""Folder not found. Please verify:
+            1. Folder ID is correct: {folder_id}
+            2. No extra characters in the ID
+            3. The ID is copied from the URL after 'folders/'""")
+        elif "403" in str(e):
+            st.error("""Permission denied. Please verify:
+            1. Service account has been added to the folder
+            2. Service account has at least 'Editor' access""")
+        return False
 
 def create_folder_structure(service, school_name, visit_date):
-    """Create folder structure: Root -> School -> Year -> Month -> Visit Date"""
+    """Create folder structure with debug logging"""
     try:
-        # Your root folder ID
         ROOT_FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
         
-        # First, create/get school folder
+        # Check root folder access first
+        st.subheader("Checking folder access...")
+        if not check_folder_access(service, ROOT_FOLDER_ID):
+            return None
+            
+        # If we get here, we have access. Continue with folder creation...
+        st.info("Creating folder structure...")
+        
+        # Create school folder
         school_query = f"name='{school_name}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
-        school_results = service.files().list(q=school_query, fields='files(id, name)').execute()
+        school_results = service.files().list(
+            q=school_query,
+            fields='files(id, name)',
+            supportsAllDrives=True
+        ).execute()
         
         if school_results.get('files'):
             school_folder_id = school_results['files'][0]['id']
+            st.success(f"✓ Found existing school folder: {school_name}")
         else:
             school_folder = service.files().create(
                 body={
@@ -127,17 +131,24 @@ def create_folder_structure(service, school_name, visit_date):
                     'mimeType': 'application/vnd.google-apps.folder',
                     'parents': [ROOT_FOLDER_ID]
                 },
-                fields='id'
+                fields='id',
+                supportsAllDrives=True
             ).execute()
             school_folder_id = school_folder['id']
+            st.success(f"✓ Created new school folder: {school_name}")
         
-        # Create/get year folder
+        # Create year folder
         year = visit_date.strftime("%Y")
         year_query = f"name='{year}' and mimeType='application/vnd.google-apps.folder' and '{school_folder_id}' in parents"
-        year_results = service.files().list(q=year_query, fields='files(id, name)').execute()
+        year_results = service.files().list(
+            q=year_query,
+            fields='files(id, name)',
+            supportsAllDrives=True
+        ).execute()
         
         if year_results.get('files'):
             year_folder_id = year_results['files'][0]['id']
+            st.success(f"✓ Found existing year folder: {year}")
         else:
             year_folder = service.files().create(
                 body={
@@ -145,17 +156,24 @@ def create_folder_structure(service, school_name, visit_date):
                     'mimeType': 'application/vnd.google-apps.folder',
                     'parents': [school_folder_id]
                 },
-                fields='id'
+                fields='id',
+                supportsAllDrives=True
             ).execute()
             year_folder_id = year_folder['id']
+            st.success(f"✓ Created new year folder: {year}")
         
-        # Create/get month folder
-        month = visit_date.strftime("%B")  # Full month name
+        # Create month folder
+        month = visit_date.strftime("%B")
         month_query = f"name='{month}' and mimeType='application/vnd.google-apps.folder' and '{year_folder_id}' in parents"
-        month_results = service.files().list(q=month_query, fields='files(id, name)').execute()
+        month_results = service.files().list(
+            q=month_query,
+            fields='files(id, name)',
+            supportsAllDrives=True
+        ).execute()
         
         if month_results.get('files'):
             month_folder_id = month_results['files'][0]['id']
+            st.success(f"✓ Found existing month folder: {month}")
         else:
             month_folder = service.files().create(
                 body={
@@ -163,17 +181,24 @@ def create_folder_structure(service, school_name, visit_date):
                     'mimeType': 'application/vnd.google-apps.folder',
                     'parents': [year_folder_id]
                 },
-                fields='id'
+                fields='id',
+                supportsAllDrives=True
             ).execute()
             month_folder_id = month_folder['id']
+            st.success(f"✓ Created new month folder: {month}")
         
-        # Create/get visit date folder
+        # Create visit date folder
         visit_folder_name = visit_date.strftime("%Y-%m-%d")
         visit_query = f"name='{visit_folder_name}' and mimeType='application/vnd.google-apps.folder' and '{month_folder_id}' in parents"
-        visit_results = service.files().list(q=visit_query, fields='files(id, name)').execute()
+        visit_results = service.files().list(
+            q=visit_query,
+            fields='files(id, name)',
+            supportsAllDrives=True
+        ).execute()
         
         if visit_results.get('files'):
-            return visit_results['files'][0]['id']
+            visit_folder_id = visit_results['files'][0]['id']
+            st.success(f"✓ Found existing visit folder: {visit_folder_name}")
         else:
             visit_folder = service.files().create(
                 body={
@@ -181,12 +206,16 @@ def create_folder_structure(service, school_name, visit_date):
                     'mimeType': 'application/vnd.google-apps.folder',
                     'parents': [month_folder_id]
                 },
-                fields='id'
+                fields='id',
+                supportsAllDrives=True
             ).execute()
-            return visit_folder['id']
+            visit_folder_id = visit_folder['id']
+            st.success(f"✓ Created new visit folder: {visit_folder_name}")
+        
+        return visit_folder_id
             
     except Exception as e:
-        st.error(f"Error creating folder structure: {str(e)}")
+        st.error(f"Error in folder structure creation: {str(e)}")
         return None
 
 def setup_folder_structure(service, school_name, visit_date):

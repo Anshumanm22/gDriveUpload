@@ -62,6 +62,41 @@ def read_from_sheet(service, range_name):
         st.error(f"Error reading from sheet: {str(e)}")
         return None
 
+def upload_to_drive(service, file_data, filename, mimetype, folder_id):
+    """Upload a file to a specific Google Drive folder."""
+    try:
+        # First check if we can access the folder
+        if not check_folder_access(service, folder_id):
+            st.error(f"Cannot access folder with ID: {folder_id}. Please make sure: \n" +
+                    "1. The folder ID is correct\n" +
+                    "2. The folder is shared with the service account email\n" +
+                    "3. The service account has at least 'Editor' access to the folder")
+            return None
+            
+        file_metadata = {
+            'name': filename,
+            'parents': [folder_id]
+        }
+        
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_data),
+            mimetype=mimetype,
+            resumable=True
+        )
+        
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
+        
+        return file.get('id')
+    except Exception as e:
+        st.error(f"Error uploading {filename}: {str(e)}")
+        return None
+
+
 def main():
     st.title("Program Manager Checklist")
     
@@ -69,6 +104,10 @@ def main():
         st.session_state.step = 1
     
     service = get_google_service()
+    if not service:
+        return
+    
+    drive_service = get_google_drive_service()
     if not service:
         return
     
@@ -318,6 +357,46 @@ def main():
                 st.success("Form submitted successfully!")
                 st.session_state.step = 1
                 st.rerun()
+ 
+        st.subheader("Photo Documentation")
+        uploaded_photos = st.file_uploader(
+            "Upload photos of infrastructure (optional)",
+            type=['png', 'jpg', 'jpeg'],
+            accept_multiple_files=True
+        )
+        
+        if uploaded_photos:
+            st.write("Selected photos:")
+            photo_ids = []  # To store uploaded photo IDs
+            
+            for photo in uploaded_photos:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📷 {photo.name}")
+                with col2:
+                    if st.button("Upload", key=f"upload_{photo.name}"):
+                        with st.spinner(f"Uploading {photo.name}..."):
+                            # Use your configured folder ID
+                            folder_id = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"  # Replace with actual folder ID
+                            photo_id = upload_to_drive(
+                                drive_service,
+                                photo.getvalue(),
+                                photo.name,
+                                photo.type,
+                                folder_id
+                            )
+                            if photo_id:
+                                photo_ids.append(photo_id)
+                                st.success(f"Successfully uploaded {photo.name}")
+                                st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+        
+        # When submitting the form, include photo IDs in the data
+        if st.button("Submit", key="submit"):
+            # Prepare and submit data including photo IDs
+            submission_data = {
+                # ... existing data ...
+                'photo_ids': photo_ids if 'photo_ids' in locals() else []
+            }
 
 if __name__ == "__main__":
     main()

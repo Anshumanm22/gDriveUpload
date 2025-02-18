@@ -389,7 +389,7 @@ def main():
              key="infra_photos"  # Added unique key
             )
             
-            photo_ids = []  # Initialize photo_ids list
+        photo_ids = []  # Initialize photo_ids list
             if uploaded_photos:
                 st.write("Selected photos:")
                 for photo in uploaded_photos:
@@ -412,14 +412,14 @@ def main():
                                     st.success(f"Successfully uploaded {photo.name}")
                                     st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
         
-            final_thoughts = st.text_area("Final thoughts and observations")
+        final_thoughts = st.text_area("Final thoughts and observations")
             
-            col1, col2 = st.columns(2)
-            with col1:
+        col1, col2 = st.columns(2)
+        with col1:
                 if st.button("Previous", key="prev_5"):
-                    st.session_state.step = 4
-                    st.rerun()
-            with col2:
+                   st.session_state.step = 4
+                   st.rerun()
+        with col2:
                 if st.button("Submit", key="submit"):
                     submission_data = {
                         'subject': subject,

@@ -469,8 +469,8 @@ def main():
         photo_ids = []
         
         if uploaded_photos:
-        st.write("Selected photos:")
-        for photo in uploaded_photos:
+            st.write("Selected photos:")
+            for photo in uploaded_photos:
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.write(f"📷 {photo.name}")

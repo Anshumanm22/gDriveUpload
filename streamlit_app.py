@@ -18,7 +18,8 @@ FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
 SCOPES = ['https://www.googleapis.com/auth/drive.file',
           'https://www.googleapis.com/auth/spreadsheets']
 
-def get_google_service():
+@st.cache_resource
+def get_sheets_service():
     """Get Google Sheets service using service account."""
     try:
         if "gcp_service_account" not in st.secrets:
@@ -30,23 +31,43 @@ def get_google_service():
             scopes=SCOPES
         )
         
-        drive_service = build('drive', 'v3', credentials=credentials)
-        sheets_service = build('sheets', 'v4', credentials=credentials)
-        
-        return drive_service, sheets_service
+        return build('sheets', 'v4', credentials=credentials)
     except Exception as e:
-        st.error(f"Error setting up Google services: {str(e)}")
-        return None, None
+        st.error(f"Error setting up Sheets service: {str(e)}")
+        return None
 
-def read_from_sheet(service, range_name):
+@st.cache_resource
+def get_drive_service():
+    """Get Google Drive service using service account."""
+    try:
+        if "gcp_service_account" not in st.secrets:
+            st.error("gcp_service_account not found in secrets")
+            return None
+            
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPES
+        )
+        
+        return build('drive', 'v3', credentials=credentials)
+    except Exception as e:
+        st.error(f"Error setting up Drive service: {str(e)}")
+        return None
+
+def read_from_sheet(sheets_service, range_name):
     """Read data from the specified Google Sheet range."""
     try:
-        sheets_service = service[1]  # Get the sheets service from the tuple
         result = sheets_service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
             range=range_name
         ).execute()
-        return pd.DataFrame(result.get('values', [])[1:], columns=result.get('values', [[]])[0])
+        
+        values = result.get('values', [])
+        if not values:
+            st.warning("No data found in the sheet")
+            return pd.DataFrame()
+            
+        return pd.DataFrame(values[1:], columns=values[0])
     except Exception as e:
         st.error(f"Error reading from sheet: {str(e)}")
         return None
@@ -77,15 +98,23 @@ def upload_to_drive(drive_service, file_data, filename, mimetype):
         st.error(f"Error uploading {filename}: {str(e)}")
         return None
 
-
 def main():
     st.title("Program Manager Checklist")
     
     if 'step' not in st.session_state:
         st.session_state.step = 1
     
-    services = get_google_service()
-    if not services:
+    # Get services
+    sheets_service = get_sheets_service()
+    drive_service = get_drive_service()
+    
+    if not sheets_service or not drive_service:
+        st.error("Failed to initialize Google services")
+        return
+    
+    # Read data
+    schools_df = read_from_sheet(sheets_service, 'Schools!A:D')
+    if schools_df is None:
         return
         
     drive_service, sheets_service = services  # Unpack the tuple

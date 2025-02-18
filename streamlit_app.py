@@ -11,6 +11,7 @@ st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
+ROOT_FOLDER_ID = None 
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
@@ -219,7 +220,7 @@ def main():
         return
     
     if 'root_folder_id' not in st.session_state:
-    root_folder_id = create_root_folder(drive_service)
+        root_folder_id = create_root_folder(drive_service)
     if root_folder_id:
         st.session_state.root_folder_id = root_folder_id
     

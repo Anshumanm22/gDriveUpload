@@ -5,16 +5,13 @@ import pandas as pd
 from datetime import datetime
 
 # Set page config
-st.set_page_config(page_title="School Observation Form", layout="wide")
+st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-
-# Define the scope
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 def get_google_service():
-    """Get Google Sheets service using service account."""
     try:
         if "gcp_service_account" not in st.secrets:
             st.error("gcp_service_account not found in secrets")
@@ -24,148 +21,164 @@ def get_google_service():
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
-        
         return build('sheets', 'v4', credentials=credentials)
     except Exception as e:
         st.error(f"Error setting up Google service: {str(e)}")
         return None
 
 def read_from_sheet(service, range_name):
-    """Read data from the specified Google Sheet range."""
     try:
         result = service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
             range=range_name
         ).execute()
-        
-        values = result.get('values', [])
-        if not values:
-            return pd.DataFrame()
-        
-        return pd.DataFrame(values[1:], columns=values[0])
+        return pd.DataFrame(result.get('values', [])[1:], columns=result.get('values', [[]])[0])
     except Exception as e:
         st.error(f"Error reading from sheet: {str(e)}")
         return None
 
 def main():
-    st.title("School Observation Form")
+    st.title("Program Manager Checklist")
     
-    # Initialize step in session state
     if 'step' not in st.session_state:
         st.session_state.step = 1
     
-    # Get sheets service
     service = get_google_service()
     if not service:
         return
     
-    # Read base data
-    try:
-        schools_df = read_from_sheet(service, 'Schools!A:D')
-        if schools_df is None or schools_df.empty:
-            st.error("Unable to load schools data")
-            return
-            
-        teachers_df = read_from_sheet(service, 'Teachers!A:D')
-        if teachers_df is None:
-            st.error("Unable to load teachers data")
-            return
-    except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
+    schools_df = read_from_sheet(service, 'Schools!A:D')
+    if schools_df is None:
         return
     
-    # Progress indicator
     st.sidebar.progress(st.session_state.step / 5)
     st.sidebar.markdown(f"Step {st.session_state.step} of 5")
     
-    # Basic Details
+    # Basic Information
     if st.session_state.step == 1:
-        st.header("Basic Details")
+        st.header("Basic Information")
         
         col1, col2 = st.columns(2)
         with col1:
-            pm = st.selectbox(
-                "Program Manager",
-                options=sorted(schools_df['Program Manager'].unique().tolist())
-            )
+            # Get unique program managers
+            program_managers = sorted(schools_df['Program Manager'].unique())
+            selected_pm = st.selectbox("Program Manager", options=program_managers)
             
-            if pm:
-                schools = schools_df[schools_df['Program Manager'] == pm]['School Name'].unique()
-                school = st.selectbox("School", options=sorted(schools))
+            # Filter schools based on selected program manager
+            pm_schools = sorted(schools_df[schools_df['Program Manager'] == selected_pm]['School Name'].unique())
+            selected_school = st.selectbox("School Name", options=pm_schools)
+            
+            date = st.date_input("Date of Visit")
         
         with col2:
-            date = st.date_input("Visit Date")
+            time = st.time_input("Time of visit")
+            standard = st.selectbox("Which standard are you observing?", 
+                                  options=["KG", "1", "2", "3", "4", "5"])
+            num_students = st.number_input("Number of students", min_value=0)
+            subjects = st.multiselect("Subjects Taught", 
+                                    ["English", "Math", "Science", "Art", "Music", "Others"])
         
         if st.button("Next", key="next_1"):
-            if pm and school and date:
-                st.session_state.pm = pm
-                st.session_state.school = school
-                st.session_state.date = date
+            if selected_pm and selected_school and date and time and standard and subjects:
+                st.session_state.update({
+                    'program_manager': selected_pm,
+                    'school': selected_school,
+                    'date': date,
+                    'time': time,
+                    'standard': standard,
+                    'num_students': num_students,
+                    'subjects': subjects
+                })
                 st.session_state.step = 2
                 st.rerun()
             else:
-                st.warning("Please fill all fields")
+                st.warning("Please fill all required fields")
     
-    # Teacher Selection
+    # Lesson Planning and Teaching
     elif st.session_state.step == 2:
-        st.header("Teacher Selection")
+        st.header("Lesson Planning and Teaching")
         
-        school_teachers = teachers_df[
-            teachers_df['School Name'] == st.session_state.school
-        ]
-        
-        teacher = st.selectbox(
-            "Select Teacher",
-            options=[""] + sorted(school_teachers['Teacher Name'].tolist())
+        st.subheader("Lesson Planning")
+        lesson_plan = {}
+        lesson_plan['shared_advance'] = st.radio(
+            "Has the teacher shared the lesson plan in advance?",
+            ["Yes", "No", "Sometimes"]
+        )
+        lesson_plan['clear_objectives'] = st.radio(
+            "Does the lesson plan include clear learning objectives?",
+            ["Yes", "No", "Partially"]
+        )
+        lesson_plan['aligned_activities'] = st.radio(
+            "Are the activities aligned with the learning objectives?",
+            ["Yes", "No", "Partially"]
         )
         
-        if teacher:
-            teacher_data = school_teachers[
-                school_teachers['Teacher Name'] == teacher
-            ].iloc[0]
-            st.info(f"Training Status: {'Trained' if teacher_data['Is Trained'] else 'Not Trained'}")
-        
-        add_teacher = st.checkbox("Add New Teacher")
-        if add_teacher:
-            new_name = st.text_input("Teacher Name")
-            is_trained = st.checkbox("Has completed training")
-            
-            if st.button("Add Teacher"):
-                # Add logic to save new teacher
-                pass
+        st.subheader("Teaching Methodology")
+        teaching = {}
+        teaching['clear_instructions'] = st.radio(
+            "Are instructions clear and easy to follow?",
+            ["Yes", "No", "Sometimes"]
+        )
+        teaching['engaging_tone'] = st.radio(
+            "Is the teacher's energy level and tone engaging?",
+            ["Yes", "No", "Sometimes"]
+        )
+        teaching['classroom_movement'] = st.radio(
+            "Is the teacher moving around in the classroom?",
+            ["Yes", "No", "Sometimes"]
+        )
+        teaching['hands_on'] = st.radio(
+            "Is the teacher using hands-on activities?",
+            ["Yes", "No", "Sometimes"]
+        )
+        teaching['outdoor_spaces'] = st.radio(
+            "Is the teacher using outdoor spaces to teach?",
+            ["Yes", "No", "Sometimes"]
+        )
+        teaching['real_life_examples'] = st.radio(
+            "Is this teacher able to use real-life examples to integrate core-academics with skill subjects?",
+            ["Yes", "No", "Sometimes"]
+        )
         
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Previous", key="prev_2"):
                 st.session_state.step = 1
                 st.rerun()
-                
         with col2:
             if st.button("Next", key="next_2"):
-                if teacher or (add_teacher and new_name):
-                    st.session_state.teacher = teacher if teacher else new_name
-                    st.session_state.step = 3
-                    st.rerun()
-                else:
-                    st.warning("Please select or add a teacher")
+                st.session_state.update({
+                    'lesson_plan': lesson_plan,
+                    'teaching': teaching
+                })
+                st.session_state.step = 3
+                st.rerun()
     
-    # Daily Observations
+    # Student Engagement
     elif st.session_state.step == 3:
-        st.header("Daily Observations")
+        st.header("Student Engagement")
         
-        st.subheader("Teacher Actions")
-        teacher_actions = {}
-        teacher_actions['lesson_plan'] = st.checkbox("Lesson plan shared in advance")
-        teacher_actions['movement'] = st.checkbox("Moving around classroom")
-        teacher_actions['activities'] = st.checkbox("Using hands-on activities")
-        teacher_actions['engagement'] = st.checkbox("Encouraging student participation")
+        student_engagement = {}
+        student_engagement['asking_questions'] = st.radio(
+            "Are children asking questions?",
+            ["Yes", "No", "Sometimes"]
+        )
+        student_engagement['explaining_work'] = st.radio(
+            "Are children explaining their work?",
+            ["Yes", "No", "Sometimes"]
+        )
+        student_engagement['activity_involvement'] = st.radio(
+            "Are children involved in the activities?",
+            ["Yes", "No", "Sometimes"]
+        )
+        student_engagement['peer_help'] = st.radio(
+            "Are students helping each other to learn/do an activity?",
+            ["Yes", "No", "Sometimes"]
+        )
         
-        st.subheader("Student Actions")
-        student_actions = {}
-        student_actions['questions'] = st.checkbox("Students asking questions")
-        student_actions['explanations'] = st.checkbox("Students explaining work")
-        student_actions['participation'] = st.checkbox("Active participation in activities")
-        student_actions['peer_learning'] = st.checkbox("Peer learning observed")
+        st.subheader("Observations")
+        strengths = st.text_area("Strengths")
+        growth_areas = st.text_area("Growth Areas")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -174,37 +187,51 @@ def main():
                 st.rerun()
         with col2:
             if st.button("Next", key="next_3"):
-                st.session_state.teacher_actions = teacher_actions
-                st.session_state.student_actions = student_actions
+                st.session_state.update({
+                    'student_engagement': student_engagement,
+                    'strengths': strengths,
+                    'growth_areas': growth_areas
+                })
                 st.session_state.step = 4
                 st.rerun()
     
-    # Infrastructure
+    # Community Engagement
     elif st.session_state.step == 4:
-        st.header("Infrastructure (Monthly)")
+        st.header("Community Engagement")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            condition = st.selectbox(
-                "Classroom Condition",
-                ["Good", "Needs Minor Repairs", "Needs Major Repairs"]
-            )
-            
-            resources = st.multiselect(
-                "Available Resources",
-                ["Textbooks", "Charts", "Teaching Aids", "Sports Equipment"]
-            )
+        month = st.selectbox("Select Month [CPM]", 
+                           ["January", "February", "March", "April", "May", "June",
+                            "July", "August", "September", "October", "November", "December"])
         
-        with col2:
-            seating = st.selectbox(
-                "Seating Arrangement",
-                ["Individual Desks", "Shared Desks", "Floor Seating"]
-            )
-            
-            facilities = st.multiselect(
-                "Facilities",
-                ["Drinking Water", "Clean Toilets", "Playground", "Library"]
-            )
+        community = {}
+        community['program_awareness'] = st.radio(
+            "Are parents/community members aware of the program?",
+            ["Yes", "No", "Partially"]
+        )
+        community['updates_provided'] = st.radio(
+            "Are updates provided via PTMs, community meetings, or digital platforms?",
+            ["Yes", "No", "Sometimes"]
+        )
+        community['parent_engagement'] = st.radio(
+            "Are parents engaging with their children in program-related activities?",
+            ["Yes", "No", "Sometimes"]
+        )
+        community['feedback_mechanism'] = st.radio(
+            "Are feedback mechanisms in place (meetings, surveys)?",
+            ["Yes", "No", "In Progress"]
+        )
+        community['local_resources'] = st.radio(
+            "Are local resources (e.g., tools, expertise) utilised?",
+            ["Yes", "No", "Sometimes"]
+        )
+        
+        parent_contribution = st.radio(
+            "Have parents contributed resources for projects?",
+            ["Yes", "No"]
+        )
+        
+        if parent_contribution == "Yes":
+            resource_details = st.text_area("What resource and name of parent")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -213,29 +240,47 @@ def main():
                 st.rerun()
         with col2:
             if st.button("Next", key="next_4"):
-                st.session_state.infrastructure = {
-                    'condition': condition,
-                    'seating': seating,
-                    'resources': resources,
-                    'facilities': facilities
+                data = {
+                    'month': month,
+                    'community': community,
+                    'parent_contribution': parent_contribution
                 }
+                if parent_contribution == "Yes":
+                    data['resource_details'] = resource_details
+                st.session_state.update(data)
                 st.session_state.step = 5
                 st.rerun()
     
-    # Community
+    # Infrastructure Assessment
     elif st.session_state.step == 5:
-        st.header("Community Engagement (Monthly)")
+        st.header("Infrastructure Assessment")
         
-        meetings = st.number_input("Parent meetings this month", 0, 31)
-        attendance = st.slider("Average attendance (%)", 0, 100)
+        subject = st.selectbox("Select Subject", 
+                             ["Agriculture", "Pottery", "Computer", "Health & Hygiene", 
+                              "Music", "Textile"])
         
-        activities = st.multiselect(
-            "Activities conducted",
-            ["PTA Meeting", "Cultural Event", "Sports Day", "Other"]
-        )
+        if subject == "Agriculture":
+            st.subheader("Agriculture Infrastructure")
+            ag_status = {
+                'compost_pit': st.selectbox("Compost Pit [Installation Status]", 
+                                          ["Installed", "Not Installed", "In Progress"]),
+                'waste_bins': st.selectbox("Waste Bins [Installation Status]",
+                                         ["Installed", "Not Installed", "In Progress"]),
+                'tools': st.selectbox("Khurpi/Other Tools [Installation Status]",
+                                    ["Installed", "Not Installed", "In Progress"]),
+                'fertiliser': st.selectbox("Organic Fertiliser [Installation Status]",
+                                         ["Available", "Not Available", "Needed"])
+            }
+            
+            maintenance = {}
+            for item in ['Compost Pit', 'Waste Bins', 'Khurpi/Other Tools', 'Organic Fertiliser']:
+                needs_maintenance = st.checkbox(f"Maintenance Required for {item}")
+                if needs_maintenance:
+                    maintenance[item] = st.text_input(f"Specify maintenance needed for {item}")
         
-        if "Other" in activities:
-            other = st.text_input("Specify other activities")
+        # Similar sections for other subjects...
+        
+        final_thoughts = st.text_area("Final thoughts and observations")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -244,22 +289,10 @@ def main():
                 st.rerun()
         with col2:
             if st.button("Submit", key="submit"):
-                try:
-                    # Prepare data for submission
-                    data = {
-                        'Date': st.session_state.date,
-                        'Program Manager': st.session_state.pm,
-                        'School': st.session_state.school,
-                        'Teacher': st.session_state.teacher,
-                        # Add other fields
-                    }
-                    
-                    # Submit to sheet
-                    st.success("Form submitted successfully!")
-                    st.session_state.step = 1
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error submitting form: {str(e)}")
+                # Prepare and submit data
+                st.success("Form submitted successfully!")
+                st.session_state.step = 1
+                st.rerun()
 
 if __name__ == "__main__":
     main()

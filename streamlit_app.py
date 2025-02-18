@@ -41,17 +41,73 @@ def get_google_drive_service():
             st.error("gcp_service_account not found in secrets")
             return None
             
+        # Updated scopes to include all necessary Drive permissions
+        SCOPES = [
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/drive.file',
+            'https://www.googleapis.com/auth/drive.metadata'
+        ]
+        
         credentials = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
-            scopes=SCOPESdrive   
+            scopes=SCOPES
         )
         
         drive_service = build('drive', 'v3', credentials=credentials)
         
+        # Test the service by trying to get the root folder
+        try:
+            root_folder = drive_service.files().get(
+                fileId='1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-',
+                fields='id, name, mimeType',
+                supportsAllDrives=True
+            ).execute()
+            st.success(f"Successfully connected to Drive and accessed root folder: {root_folder.get('name')}")
+        except Exception as folder_error:
+            st.error(f"Connected to Drive but couldn't access root folder: {str(folder_error)}")
+        
         return drive_service
     except Exception as e:
-        st.error(f"Error setting up Google services: {str(e)}")
+        st.error(f"Error setting up Google Drive service: {str(e)}")
         return None
+
+def test_upload_permissions(service, folder_id):
+    """Test function to verify upload permissions"""
+    try:
+        # Create a small test file
+        file_metadata = {
+            'name': 'test.txt',
+            'parents': [folder_id]
+        }
+        
+        # Create a small text file in memory
+        from io import BytesIO
+        file_content = BytesIO(b'Test file content')
+        
+        media = MediaIoBaseUpload(
+            file_content,
+            mimetype='text/plain',
+            resumable=True
+        )
+        
+        # Try to upload
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
+        
+        st.success(f"Successfully created test file with ID: {file.get('id')}")
+        
+        # Clean up by deleting the test file
+        service.files().delete(fileId=file.get('id')).execute()
+        st.info("Test file deleted successfully")
+        
+        return True
+    except Exception as e:
+        st.error(f"Error testing upload permissions: {str(e)}")
+        return False
         
 def read_from_sheet(service, range_name):
     try:
@@ -534,12 +590,19 @@ def main():
     )
     
         photo_ids = []
-        if uploaded_photos:
+        # In your main function where you handle uploads:
+if uploaded_photos:
+    drive_service = get_google_drive_service()
+    if drive_service:
+        # Test upload permissions first
+        if test_upload_permissions(drive_service, "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"):
+            st.success("Upload permissions verified successfully")
+            
             # Get the target folder for this visit
             target_folder_id = create_folder_structure(
                 drive_service,
-                st.session_state.school,  # From Step 1
-                st.session_state.date     # From Step 1
+                st.session_state.school,
+                st.session_state.date
             )
             
             if target_folder_id:
@@ -551,7 +614,6 @@ def main():
                     with col2:
                         if st.button("Upload", key=f"upload_{photo.name}"):
                             with st.spinner(f"Uploading {photo.name}..."):
-                                # Add timestamp to filename
                                 timestamp = datetime.now().strftime("%H%M%S")
                                 new_filename = f"{timestamp}_{photo.name}"
                                 
@@ -563,11 +625,14 @@ def main():
                                     target_folder_id
                                 )
                                 if photo_id:
-                                    photo_ids.append(photo_id)
                                     st.success(f"Successfully uploaded {photo.name}")
                                     st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
             else:
                 st.error("Could not create folder structure for photos")
+        else:
+            st.error("Failed to verify upload permissions")
+    else:
+        st.error("Could not initialize Google Drive service")
                 
         final_thoughts = st.text_area("Final thoughts and observations")
         

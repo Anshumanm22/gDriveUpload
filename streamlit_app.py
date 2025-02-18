@@ -108,6 +108,79 @@ def check_folder_access(service, folder_id):
                 3. The service account has at least 'Editor' permissions""")
             return False
 
+def create_or_get_folder(service, folder_name, parent_id=None):
+    """Create a new folder or get existing folder ID."""
+    try:
+        # Check if folder already exists
+        query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder'"
+        if parent_id:
+            query += f" and '{parent_id}' in parents"
+        
+        results = service.files().list(
+            q=query,
+            spaces='drive',
+            fields='files(id, name)'
+        ).execute()
+        
+        files = results.get('files', [])
+        
+        # If folder exists, return its ID
+        if files:
+            return files[0]['id']
+        
+        # If folder doesn't exist, create it
+        folder_metadata = {
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        if parent_id:
+            folder_metadata['parents'] = [parent_id]
+            
+        folder = service.files().create(
+            body=folder_metadata,
+            fields='id'
+        ).execute()
+        
+        return folder.get('id')
+        
+    except Exception as e:
+        st.error(f"Error creating/getting folder: {str(e)}")
+        return None
+
+def setup_folder_structure(service, school_name, visit_date):
+    """Create folder structure: Root -> School -> Year -> Month -> Visit Date"""
+    try:
+        # Root folder ID (replace with your actual root folder ID)
+        ROOT_FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
+        
+        # Create/get school folder
+        school_folder_id = create_or_get_folder(service, school_name, ROOT_FOLDER_ID)
+        if not school_folder_id:
+            return None
+            
+        # Create/get year folder
+        year = visit_date.strftime("%Y")
+        year_folder_id = create_or_get_folder(service, year, school_folder_id)
+        if not year_folder_id:
+            return None
+            
+        # Create/get month folder
+        month = visit_date.strftime("%B")  # Full month name
+        month_folder_id = create_or_get_folder(service, month, year_folder_id)
+        if not month_folder_id:
+            return None
+            
+        # Create/get visit date folder
+        visit_folder_name = visit_date.strftime("%Y-%m-%d")
+        visit_folder_id = create_or_get_folder(service, visit_folder_name, month_folder_id)
+        
+        return visit_folder_id
+        
+    except Exception as e:
+        st.error(f"Error setting up folder structure: {str(e)}")
+        return None
+
+
 
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):
     try:
@@ -381,37 +454,51 @@ def main():
         
         # Similar sections for other subjects...
         
+        # In the main function, where you handle photo uploads:
         st.subheader("Photo Documentation")
         uploaded_photos = st.file_uploader(
             "Upload photos of infrastructure (optional)",
             type=['png', 'jpg', 'jpeg'],
             accept_multiple_files=True,
-            key="infra_photos"  # Added unique key
+            key="infra_photos"
         )
         
-        photo_ids = []  # Initialize photo_ids list
+        photo_ids = []
         if uploaded_photos:
-            st.write("Selected photos:")
-            for photo in uploaded_photos:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📷 {photo.name}")
-                with col2:
-                    if st.button("Upload", key=f"upload_{photo.name}"):
-                        with st.spinner(f"Uploading {photo.name}..."):
-                            folder_id = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
-                            photo_id = upload_to_drive(
-                                drive_service,
-                                photo.getvalue(),
-                                photo.name,
-                                photo.type,
-                                folder_id
-                            )
-                            if photo_id:
-                                photo_ids.append(photo_id)
-                                st.success(f"Successfully uploaded {photo.name}")
-                                st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")    
-        
+            # Get the visit folder ID
+            visit_folder_id = setup_folder_structure(
+                drive_service,
+                st.session_state.school,  # From Step 1
+                st.session_state.date     # From Step 1
+            )
+            
+            if not visit_folder_id:
+                st.error("Could not create folder structure for photos")
+            else:
+                st.write("Selected photos:")
+                for photo in uploaded_photos:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"📷 {photo.name}")
+                    with col2:
+                        if st.button("Upload", key=f"upload_{photo.name}"):
+                            with st.spinner(f"Uploading {photo.name}..."):
+                                # Add timestamp to filename
+                                timestamp = datetime.now().strftime("%H%M%S")
+                                new_filename = f"{timestamp}_{photo.name}"
+                                
+                                photo_id = upload_to_drive(
+                                    drive_service,
+                                    photo.getvalue(),
+                                    new_filename,
+                                    photo.type,
+                                    visit_folder_id  # Use the visit date folder
+                                )
+                                if photo_id:
+                                    photo_ids.append(photo_id)
+                                    st.success(f"Successfully uploaded {photo.name}")
+                                    st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")   
+                
         final_thoughts = st.text_area("Final thoughts and observations")
         
         col1, col2 = st.columns(2)

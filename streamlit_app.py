@@ -11,7 +11,6 @@ st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-root_folder_id = None 
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
@@ -109,40 +108,85 @@ def check_folder_access(service, folder_id):
                 3. The service account has at least 'Editor' permissions""")
             return False
 
-def create_root_folder(service, root_folder_name="School Visit Photos"):
-    """Create or get the root folder for all school visit photos."""
+def create_folder_structure(service, school_name, visit_date):
+    """Create folder structure: Root -> School -> Year -> Month -> Visit Date"""
     try:
-        # Check if root folder already exists
-        query = f"name='{root_folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(
-            q=query,
-            spaces='drive',
-            fields='files(id, name)'
-        ).execute()
+        # Your root folder ID
+        ROOT_FOLDER_ID = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
         
-        files = results.get('files', [])
+        # First, create/get school folder
+        school_query = f"name='{school_name}' and mimeType='application/vnd.google-apps.folder' and '{ROOT_FOLDER_ID}' in parents"
+        school_results = service.files().list(q=school_query, fields='files(id, name)').execute()
         
-        # If folder exists, return its ID
-        if files:
-            st.success(f"Using existing root folder: {root_folder_name}")
-            return files[0]['id']
+        if school_results.get('files'):
+            school_folder_id = school_results['files'][0]['id']
+        else:
+            school_folder = service.files().create(
+                body={
+                    'name': school_name,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [ROOT_FOLDER_ID]
+                },
+                fields='id'
+            ).execute()
+            school_folder_id = school_folder['id']
         
-        # If folder doesn't exist, create it
-        folder_metadata = {
-            'name': root_folder_name,
-            'mimeType': 'application/vnd.google-apps.folder'
-        }
+        # Create/get year folder
+        year = visit_date.strftime("%Y")
+        year_query = f"name='{year}' and mimeType='application/vnd.google-apps.folder' and '{school_folder_id}' in parents"
+        year_results = service.files().list(q=year_query, fields='files(id, name)').execute()
         
-        folder = service.files().create(
-            body=folder_metadata,
-            fields='id'
-        ).execute()
+        if year_results.get('files'):
+            year_folder_id = year_results['files'][0]['id']
+        else:
+            year_folder = service.files().create(
+                body={
+                    'name': year,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [school_folder_id]
+                },
+                fields='id'
+            ).execute()
+            year_folder_id = year_folder['id']
         
-        st.success(f"Created new root folder: {root_folder_name}")
-        return folder.get('id')
+        # Create/get month folder
+        month = visit_date.strftime("%B")  # Full month name
+        month_query = f"name='{month}' and mimeType='application/vnd.google-apps.folder' and '{year_folder_id}' in parents"
+        month_results = service.files().list(q=month_query, fields='files(id, name)').execute()
         
+        if month_results.get('files'):
+            month_folder_id = month_results['files'][0]['id']
+        else:
+            month_folder = service.files().create(
+                body={
+                    'name': month,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [year_folder_id]
+                },
+                fields='id'
+            ).execute()
+            month_folder_id = month_folder['id']
+        
+        # Create/get visit date folder
+        visit_folder_name = visit_date.strftime("%Y-%m-%d")
+        visit_query = f"name='{visit_folder_name}' and mimeType='application/vnd.google-apps.folder' and '{month_folder_id}' in parents"
+        visit_results = service.files().list(q=visit_query, fields='files(id, name)').execute()
+        
+        if visit_results.get('files'):
+            return visit_results['files'][0]['id']
+        else:
+            visit_folder = service.files().create(
+                body={
+                    'name': visit_folder_name,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [month_folder_id]
+                },
+                fields='id'
+            ).execute()
+            return visit_folder['id']
+            
     except Exception as e:
-        st.error(f"Error creating root folder: {str(e)}")
+        st.error(f"Error creating folder structure: {str(e)}")
         return None
 
 def setup_folder_structure(service, school_name, visit_date):
@@ -217,12 +261,6 @@ def main():
     drive_service = get_google_drive_service()
     if not service:
         return
-    
-    root_folder_id = st.session_state.get('root_folder_id')
-    if not root_folder_id:
-        root_folder_id = create_root_folder(drive_service)
-        if root_folder_id:
-            st.session_state.root_folder_id = root_folder_id
     
     schools_df = read_from_sheet(service, 'Schools!A:D')
     if schools_df is None:
@@ -460,37 +498,47 @@ def main():
         # In the main function, where you handle photo uploads:
         st.subheader("Photo Documentation")
         uploaded_photos = st.file_uploader(
-            "Upload photos of infrastructure (optional)",
-            type=['png', 'jpg', 'jpeg'],
-            accept_multiple_files=True,
-            key="infra_photos"
-        )
-        
+        "Upload photos of infrastructure (optional)",
+        type=['png', 'jpg', 'jpeg'],
+        accept_multiple_files=True,
+        key="infra_photos"
+    )
+    
         photo_ids = []
-        
         if uploaded_photos:
-            st.write("Selected photos:")
-            for photo in uploaded_photos:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📷 {photo.name}")
-                with col2:
-                    if st.button("Upload", key=f"upload_{photo.name}"):
-                        with st.spinner(f"Uploading {photo.name}..."):
-                            if 'root_folder_id' in st.session_state:
+            # Get the target folder for this visit
+            target_folder_id = create_folder_structure(
+                drive_service,
+                st.session_state.school,  # From Step 1
+                st.session_state.date     # From Step 1
+            )
+            
+            if target_folder_id:
+                st.write("Selected photos:")
+                for photo in uploaded_photos:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"📷 {photo.name}")
+                    with col2:
+                        if st.button("Upload", key=f"upload_{photo.name}"):
+                            with st.spinner(f"Uploading {photo.name}..."):
+                                # Add timestamp to filename
+                                timestamp = datetime.now().strftime("%H%M%S")
+                                new_filename = f"{timestamp}_{photo.name}"
+                                
                                 photo_id = upload_to_drive(
                                     drive_service,
                                     photo.getvalue(),
-                                    photo.name,
+                                    new_filename,
                                     photo.type,
-                                    st.session_state.root_folder_id
+                                    target_folder_id
                                 )
                                 if photo_id:
                                     photo_ids.append(photo_id)
                                     st.success(f"Successfully uploaded {photo.name}")
                                     st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
-                            else:
-                                st.error("Root folder not found. Please refresh the page.")   
+            else:
+                st.error("Could not create folder structure for photos")
                 
         final_thoughts = st.text_area("Final thoughts and observations")
         

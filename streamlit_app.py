@@ -174,10 +174,10 @@ def main():
         with col2:
             time = st.time_input("Time of visit")
             standard = st.selectbox("Which standard are you observing?", 
-                                  options=["KG", "1", "2", "3", "4", "5"])
+                                  options=["1", "2", "3", "4", "5"])
             num_students = st.number_input("Number of students", min_value=0)
             subjects = st.multiselect("Subjects Taught", 
-                                    ["English", "Math", "Science", "Art", "Music", "Others"])
+                                    ["English", "Math", "Science", "Hindi", "Music", "Agriculture"])
         
         if st.button("Next", key="next_1"):
             if selected_pm and selected_school and date and time and standard and subjects:

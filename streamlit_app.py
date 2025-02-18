@@ -179,7 +179,6 @@ def setup_folder_structure(service, school_name, visit_date):
         return None
 
 
-
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):
     try:
         file_metadata = {

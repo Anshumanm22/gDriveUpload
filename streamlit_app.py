@@ -390,11 +390,11 @@ def main():
         with col2:
                # When submitting the form, include photo IDs in the data
             if st.button("Submit", key="submit"):
-            # Prepare and submit data including photo IDs
-            submission_data = {
+                # Prepare and submit data including photo IDs
+                submission_data = {
                 # ... existing data ...
-                'photo_ids': photo_ids if 'photo_ids' in locals() else []
-            }
+                    'photo_ids': photo_ids if 'photo_ids' in locals() else []
+                }
                 # Prepare and submit data
                 st.success("Form submitted successfully!")
                 st.session_state.step = 1

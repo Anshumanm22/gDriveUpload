@@ -382,7 +382,7 @@ def main():
         # Similar sections for other subjects...
         
         st.subheader("Photo Documentation")
-                uploaded_photos = st.file_uploader(
+            uploaded_photos = st.file_uploader(
                 "Upload photos of infrastructure (optional)",
                 type=['png', 'jpg', 'jpeg'],
                 accept_multiple_files=True,

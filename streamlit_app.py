@@ -390,8 +390,8 @@ def main():
             )
             
         photo_ids = []  # Initialize photo_ids list
-            if uploaded_photos:
-                st.write("Selected photos:")
+        if uploaded_photos:
+            st.write("Selected photos:")
                 for photo in uploaded_photos:
                     col1, col2 = st.columns([3, 1])
                     with col1:
@@ -407,10 +407,10 @@ def main():
                                     photo.type,
                                     folder_id
                                 )
-                                if photo_id:
-                                    photo_ids.append(photo_id)
-                                    st.success(f"Successfully uploaded {photo.name}")
-                                    st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+                        if photo_id:
+                            photo_ids.append(photo_id)
+                            st.success(f"Successfully uploaded {photo.name}")
+                            st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")    
         
         final_thoughts = st.text_area("Final thoughts and observations")
             

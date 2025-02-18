@@ -108,16 +108,7 @@ def check_folder_access(service, folder_id):
 
 
 def upload_to_drive(service, file_data, filename, mimetype, folder_id):
-    """Upload a file to a specific Google Drive folder."""
     try:
-        # First check if we can access the folder
-        if not check_folder_access(service, folder_id):
-            st.error(f"Cannot access folder with ID: {folder_id}. Please make sure: \n" +
-                    "1. The folder ID is correct\n" +
-                    "2. The folder is shared with the service account email\n" +
-                    "3. The service account has at least 'Editor' access to the folder")
-            return None
-            
         file_metadata = {
             'name': filename,
             'parents': [folder_id]
@@ -140,7 +131,6 @@ def upload_to_drive(service, file_data, filename, mimetype, folder_id):
     except Exception as e:
         st.error(f"Error uploading {filename}: {str(e)}")
         return None
-
 
 def main():
     st.title("Program Manager Checklist")

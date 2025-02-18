@@ -46,7 +46,7 @@ def get_google_drive_service():
         
         drive_service = build('drive', 'v3', credentials=credentials)
         
-        return sheets_service, drive_service
+        return drive_service
     except Exception as e:
         st.error(f"Error setting up Google services: {str(e)}")
         return None

@@ -218,10 +218,11 @@ def main():
     if not service:
         return
     
-    if 'root_folder_id' not in st.session_state:
+    root_folder_id = st.session_state.get('root_folder_id')
+    if not root_folder_id:
         root_folder_id = create_root_folder(drive_service)
-    if root_folder_id:
-        st.session_state.root_folder_id = root_folder_id
+        if root_folder_id:
+            st.session_state.root_folder_id = root_folder_id
     
     schools_df = read_from_sheet(service, 'Schools!A:D')
     if schools_df is None:

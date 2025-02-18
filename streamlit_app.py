@@ -471,26 +471,26 @@ def main():
         if uploaded_photos:
             st.write("Selected photos:")
             for photo in uploaded_photos:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.write(f"📷 {photo.name}")
-            with col2:
-                if st.button("Upload", key=f"upload_{photo.name}"):
-                    with st.spinner(f"Uploading {photo.name}..."):
-                        if 'root_folder_id' in st.session_state:
-                            photo_id = upload_to_drive(
-                                drive_service,
-                                photo.getvalue(),
-                                photo.name,
-                                photo.type,
-                                st.session_state.root_folder_id
-                            )
-                            if photo_id:
-                                photo_ids.append(photo_id)
-                                st.success(f"Successfully uploaded {photo.name}")
-                                st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
-                        else:
-                            st.error("Root folder not found. Please refresh the page.")   
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📷 {photo.name}")
+                with col2:
+                    if st.button("Upload", key=f"upload_{photo.name}"):
+                        with st.spinner(f"Uploading {photo.name}..."):
+                            if 'root_folder_id' in st.session_state:
+                                photo_id = upload_to_drive(
+                                    drive_service,
+                                    photo.getvalue(),
+                                    photo.name,
+                                    photo.type,
+                                    st.session_state.root_folder_id
+                                )
+                                if photo_id:
+                                    photo_ids.append(photo_id)
+                                    st.success(f"Successfully uploaded {photo.name}")
+                                    st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+                            else:
+                                st.error("Root folder not found. Please refresh the page.")   
                 
         final_thoughts = st.text_area("Final thoughts and observations")
         

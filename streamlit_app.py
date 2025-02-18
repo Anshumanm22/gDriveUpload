@@ -41,7 +41,8 @@ def get_google_service():
 def read_from_sheet(service, range_name):
     """Read data from the specified Google Sheet range."""
     try:
-        result = service.spreadsheets().values().get(
+        sheets_service = service[1]  # Get the sheets service from the tuple
+        result = sheets_service.spreadsheets().values().get(
             spreadsheetId=SHEET_ID,
             range=range_name
         ).execute()
@@ -83,11 +84,13 @@ def main():
     if 'step' not in st.session_state:
         st.session_state.step = 1
     
-    service = get_google_service()
-    if not service:
+    services = get_google_service()
+    if not services:
         return
+        
+    drive_service, sheets_service = services  # Unpack the tuple
     
-    schools_df = read_from_sheet(service, 'Schools!A:D')
+    schools_df = read_from_sheet(services, 'Schools!A:D')  # Pass both services
     if schools_df is None:
         return
     

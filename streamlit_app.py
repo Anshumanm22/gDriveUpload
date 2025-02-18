@@ -9,32 +9,48 @@ st.set_page_config(page_title="Program Manager Checklist", layout="wide")
 
 # Hardcoded IDs
 SHEET_ID = "1EthvhhCttQDabz1qJenLqHTDDJ1zFxK-rFZMQH9p4uw"
-# Update SCOPES
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive.file'
 ]
 
-# Update get_google_service to return both services
 def get_google_service():
     try:
         if "gcp_service_account" not in st.secrets:
             st.error("gcp_service_account not found in secrets")
-            return None, None
+            return None
             
         credentials = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],
             scopes=SCOPES
         )
+        return build('sheets', 'v4', credentials=credentials)
+    except Exception as e:
+        st.error(f"Error setting up Google service: {str(e)}")
+        return None
+
+SCOPESdrive = [
+    'https://www.googleapis.com/auth/drive.file'
+]
+
+#for google_drive_service
+def get_google_drive_service():
+    try:
+        if "gcp_service_account" not in st.secrets:
+            st.error("gcp_service_account not found in secrets")
+            return None
+            
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=SCOPESdrive   
+        )
         
-        sheets_service = build('sheets', 'v4', credentials=credentials)
         drive_service = build('drive', 'v3', credentials=credentials)
         
         return sheets_service, drive_service
     except Exception as e:
         st.error(f"Error setting up Google services: {str(e)}")
-        return None, None
-
+        return None
+        
 def read_from_sheet(service, range_name):
     try:
         result = service.spreadsheets().values().get(

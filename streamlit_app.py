@@ -381,57 +381,57 @@ def main():
         
         # Similar sections for other subjects...
         
-        final_thoughts = st.text_area("Final thoughts and observations")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Previous", key="prev_5"):
-                st.session_state.step = 4
-                st.rerun()
-        with col2:
-               # When submitting the form, include photo IDs in the data
-            if st.button("Submit", key="submit"):
-                # Prepare and submit data including photo IDs
-                submission_data = {
-                # ... existing data ...
-                    'photo_ids': photo_ids if 'photo_ids' in locals() else []
-                }
-                # Prepare and submit data
-                st.success("Form submitted successfully!")
-                st.session_state.step = 1
-                st.rerun()
- 
         st.subheader("Photo Documentation")
-        uploaded_photos = st.file_uploader(
-            "Upload photos of infrastructure (optional)",
-            type=['png', 'jpg', 'jpeg'],
-            accept_multiple_files=True
-        )
-        
-        if uploaded_photos:
-            st.write("Selected photos:")
-            photo_ids = []  # To store uploaded photo IDs
+                uploaded_photos = st.file_uploader(
+                "Upload photos of infrastructure (optional)",
+                type=['png', 'jpg', 'jpeg'],
+                accept_multiple_files=True,
+                key="infra_photos"  # Added unique key
+            )
             
-            for photo in uploaded_photos:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"📷 {photo.name}")
-                with col2:
-                    if st.button("Upload", key=f"upload_{photo.name}"):
-                        with st.spinner(f"Uploading {photo.name}..."):
-                            # Use your configured folder ID
-                            folder_id = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"  # Replace with actual folder ID
-                            photo_id = upload_to_drive(
-                                drive_service,
-                                photo.getvalue(),
-                                photo.name,
-                                photo.type,
-                                folder_id
-                            )
-                            if photo_id:
-                                photo_ids.append(photo_id)
-                                st.success(f"Successfully uploaded {photo.name}")
-                                st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+            photo_ids = []  # Initialize photo_ids list
+            if uploaded_photos:
+                st.write("Selected photos:")
+                for photo in uploaded_photos:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"📷 {photo.name}")
+                    with col2:
+                        if st.button("Upload", key=f"upload_{photo.name}"):
+                            with st.spinner(f"Uploading {photo.name}..."):
+                                folder_id = "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"
+                                photo_id = upload_to_drive(
+                                    drive_service,
+                                    photo.getvalue(),
+                                    photo.name,
+                                    photo.type,
+                                    folder_id
+                                )
+                                if photo_id:
+                                    photo_ids.append(photo_id)
+                                    st.success(f"Successfully uploaded {photo.name}")
+                                    st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+        
+            final_thoughts = st.text_area("Final thoughts and observations")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Previous", key="prev_5"):
+                    st.session_state.step = 4
+                    st.rerun()
+            with col2:
+                if st.button("Submit", key="submit"):
+                    submission_data = {
+                        'subject': subject,
+                        'ag_status': ag_status if subject == "Agriculture" else None,
+                        'maintenance': maintenance if subject == "Agriculture" else None,
+                        'final_thoughts': final_thoughts,
+                        'photo_ids': photo_ids  # Now photo_ids is always defined
+                    }
+                    # Add code here to save submission_data to your Google Sheet
+                    st.success("Form submitted successfully!")
+                    st.session_state.step = 1
+                    st.rerun()
 
 if __name__ == "__main__":
     main()

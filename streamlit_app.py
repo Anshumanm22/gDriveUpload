@@ -591,48 +591,48 @@ def main():
     
         photo_ids = []
         # In your main function where you handle uploads:
-if uploaded_photos:
-    drive_service = get_google_drive_service()
-    if drive_service:
-        # Test upload permissions first
-        if test_upload_permissions(drive_service, "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"):
-            st.success("Upload permissions verified successfully")
-            
-            # Get the target folder for this visit
-            target_folder_id = create_folder_structure(
-                drive_service,
-                st.session_state.school,
-                st.session_state.date
-            )
-            
-            if target_folder_id:
-                st.write("Selected photos:")
-                for photo in uploaded_photos:
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"📷 {photo.name}")
-                    with col2:
-                        if st.button("Upload", key=f"upload_{photo.name}"):
-                            with st.spinner(f"Uploading {photo.name}..."):
-                                timestamp = datetime.now().strftime("%H%M%S")
-                                new_filename = f"{timestamp}_{photo.name}"
-                                
-                                photo_id = upload_to_drive(
-                                    drive_service,
-                                    photo.getvalue(),
-                                    new_filename,
-                                    photo.type,
-                                    target_folder_id
-                                )
-                                if photo_id:
-                                    st.success(f"Successfully uploaded {photo.name}")
-                                    st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+        if uploaded_photos:
+            drive_service = get_google_drive_service()
+            if drive_service:
+                # Test upload permissions first
+                if test_upload_permissions(drive_service, "1qkrf5GEbhl0eRCtH9I2_zGsD8EbPXlH-"):
+                    st.success("Upload permissions verified successfully")
+                    
+                    # Get the target folder for this visit
+                    target_folder_id = create_folder_structure(
+                        drive_service,
+                        st.session_state.school,
+                        st.session_state.date
+                    )
+                    
+                    if target_folder_id:
+                        st.write("Selected photos:")
+                        for photo in uploaded_photos:
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.write(f"📷 {photo.name}")
+                            with col2:
+                                if st.button("Upload", key=f"upload_{photo.name}"):
+                                    with st.spinner(f"Uploading {photo.name}..."):
+                                        timestamp = datetime.now().strftime("%H%M%S")
+                                        new_filename = f"{timestamp}_{photo.name}"
+                                        
+                                        photo_id = upload_to_drive(
+                                            drive_service,
+                                            photo.getvalue(),
+                                            new_filename,
+                                            photo.type,
+                                            target_folder_id
+                                        )
+                                        if photo_id:
+                                            st.success(f"Successfully uploaded {photo.name}")
+                                            st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
+                    else:
+                        st.error("Could not create folder structure for photos")
+                else:
+                    st.error("Failed to verify upload permissions")
             else:
-                st.error("Could not create folder structure for photos")
-        else:
-            st.error("Failed to verify upload permissions")
-    else:
-        st.error("Could not initialize Google Drive service")
+                st.error("Could not initialize Google Drive service")
                 
         final_thoughts = st.text_area("Final thoughts and observations")
         

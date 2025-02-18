@@ -388,7 +388,13 @@ def main():
                 st.session_state.step = 4
                 st.rerun()
         with col2:
+               # When submitting the form, include photo IDs in the data
             if st.button("Submit", key="submit"):
+            # Prepare and submit data including photo IDs
+            submission_data = {
+                # ... existing data ...
+                'photo_ids': photo_ids if 'photo_ids' in locals() else []
+            }
                 # Prepare and submit data
                 st.success("Form submitted successfully!")
                 st.session_state.step = 1
@@ -425,14 +431,6 @@ def main():
                                 photo_ids.append(photo_id)
                                 st.success(f"Successfully uploaded {photo.name}")
                                 st.markdown(f"[View photo](https://drive.google.com/file/d/{photo_id}/view)")
-        
-        # When submitting the form, include photo IDs in the data
-        if st.button("Submit", key="submit"):
-            # Prepare and submit data including photo IDs
-            submission_data = {
-                # ... existing data ...
-                'photo_ids': photo_ids if 'photo_ids' in locals() else []
-            }
 
 if __name__ == "__main__":
     main()
